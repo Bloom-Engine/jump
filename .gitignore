@@ -1,0 +1,9 @@
+node_modules/
+target/
+jump
+editor
+*.o
+_perry_stubs.o
+_perry_failed_stubs.o
+dist/
+.DS_Store
