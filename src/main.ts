@@ -100,6 +100,18 @@ const WHITE: Color = { r: 255, g: 255, b: 255, a: 255 };
 const BLACK: Color = { r: 0, g: 0, b: 0, a: 255 };
 const SKY_TOP: Color = { r: 100, g: 180, b: 255, a: 255 };
 const SKY_BOT: Color = { r: 180, g: 220, b: 255, a: 255 };
+const MOUNT_COLOR: Color = { r: 140, g: 160, b: 200, a: 100 };
+const HILL_COLOR: Color = { r: 80, g: 150, b: 80, a: 80 };
+const FLAG_GLOW: Color = { r: 50, g: 255, b: 50, a: 60 };
+const FLAG_POLE: Color = { r: 160, g: 160, b: 170, a: 255 };
+const FLAG_BANNER: Color = { r: 230, g: 40, b: 40, a: 255 };
+const FLAG_BANNER2: Color = { r: 210, g: 30, b: 30, a: 255 };
+const FLAG_BALL: Color = { r: 255, g: 220, b: 50, a: 255 };
+const FLAG_TEXT: Color = { r: 255, g: 255, b: 50, a: 255 };
+const LOADING_BG: Color = { r: 30, g: 30, b: 40, a: 255 };
+const LOADING_TEXT: Color = { r: 200, g: 200, b: 220, a: 255 };
+const MENU_DIM: Color = { r: 200, g: 200, b: 220, a: 200 };
+const SKY_STRIP: Color = { r: 0, g: 0, b: 0, a: 255 }; // reused per sky gradient strip
 
 // ============================================================
 // GAME STATE (all const arrays for Perry safety)
@@ -131,6 +143,11 @@ const GI_FLAG = 4; const GI_CTIMER = 5; const GI_DTIMER = 6;
 // Level data
 const TILES: number[] = [];
 const LVL = [0.0, 0.0, 0.0, 0.0]; // [width, height, spawnX, spawnY]
+const FLAG_POS = [0.0, 0.0, 0.0]; // [x_pixels, y_pixels, active]
+
+// Pre-allocated rects for collision checks (avoid per-frame allocation)
+const PRECT: Rect = { x: 0.0, y: 0.0, width: PW, height: PH };
+const ERECT: Rect = { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
 
 // Enemy pool (parallel arrays)
 const EX: number[] = []; const EY: number[] = []; const EVX: number[] = []; const EVY: number[] = [];
@@ -162,15 +179,12 @@ const TEX_PATHS = [
   "assets/sprites/enemies.png",
   "assets/sprites/items.png",
   "assets/sprites/ui.png",
-  "assets/sprites/bg_mountains.png",
-  "assets/sprites/bg_hills.png",
-  "assets/sprites/bg_clouds.png",
 ];
 
 // Show loading screen
 beginDrawing();
-clearBackground({ r: 30, g: 30, b: 40, a: 255 });
-drawText("Loading...", SCREEN_W / 2 - 60, SCREEN_H / 2 - 10, 24, { r: 200, g: 200, b: 220, a: 255 });
+clearBackground(LOADING_BG);
+drawText("Loading...", SCREEN_W / 2 - 60, SCREEN_H / 2 - 10, 24, LOADING_TEXT);
 endDrawing();
 
 // Stage all textures on background threads (parallel decode)
@@ -187,9 +201,6 @@ const texItems = commitTexture(staged[3]);
 setTextureFilter(texItems, FILTER_NEAREST);
 const texUI = commitTexture(staged[4]);
 setTextureFilter(texUI, FILTER_NEAREST);
-const texBgMount = commitTexture(staged[5]);
-const texBgHills = commitTexture(staged[6]);
-const texBgClouds = commitTexture(staged[7]);
 
 // Load sounds
 const sndJump = loadSound("assets/sounds/jump.wav");
@@ -342,7 +353,7 @@ function updateParticles(dt: number): void {
     if (PRL[i] <= 0.0) continue;
     PRX[i] = PRX[i] + PRVX[i] * dt;
     PRY[i] = PRY[i] + PRVY[i] * dt;
-    PRVY[i] = PRVY[i] + 400.0 * dt; // particle gravity
+    PRVY[i] = PRVY[i] + 400.0 * dt;
     PRL[i] = PRL[i] - dt;
   }
 }
@@ -371,6 +382,7 @@ function clearLevel(): void {
   for (let i = 0; i < MAX_ENEMIES; i = i + 1) EA[i] = 0.0;
   for (let i = 0; i < MAX_COINS; i = i + 1) CA[i] = 0.0;
   for (let i = 0; i < MAX_PARTICLES; i = i + 1) PRL[i] = 0.0;
+  FLAG_POS[0] = 0.0; FLAG_POS[1] = 0.0; FLAG_POS[2] = 0.0;
 }
 
 // Parse numbers directly from string at offset, returns [value, nextIndex]
@@ -483,6 +495,19 @@ function parseEntitiesLine(s: string, start: number): void {
           else if (eType < 2.5) { EVX[floorf(enemyIdx)] = 40.0; EVY[floorf(enemyIdx)] = 0.0; }
           else { EVX[floorf(enemyIdx)] = 0.0; EVY[floorf(enemyIdx)] = 0.0; }
           enemyIdx = enemyIdx + 1.0;
+        }
+      } else if (eType > 19.5) {
+        // Flag — store in dedicated array for reliable access
+        FLAG_POS[0] = ex * TILE_SIZE;
+        FLAG_POS[1] = ey * TILE_SIZE;
+        FLAG_POS[2] = 1.0;
+        // Also store as collectible for collision detection
+        if (coinIdx < MAX_COINS) {
+          CX[floorf(coinIdx)] = ex * TILE_SIZE;
+          CY[floorf(coinIdx)] = ey * TILE_SIZE;
+          CT[floorf(coinIdx)] = eType;
+          CA[floorf(coinIdx)] = 1.0;
+          coinIdx = coinIdx + 1.0;
         }
       } else if (eType > 9.5) {
         if (coinIdx < MAX_COINS) {
@@ -920,12 +945,12 @@ function updateEnemies(dt: number): void {
       // Chaser: pursue when close
       const dx = playerCX - (EX[i] + TILE_SIZE * 0.5);
       const dy = playerCY - (EY[i] + TILE_SIZE * 0.5);
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 200.0 && P[PI_DEAD] < 0.5) {
+      const distSq = dx * dx + dy * dy;
+      if (distSq < 40000.0 && P[PI_DEAD] < 0.5) {
         const chaseSpeed = 120.0;
         if (dx > 0.0) { EVX[i] = chaseSpeed; ES[i] = 1.0; }
         else { EVX[i] = 0.0 - chaseSpeed; ES[i] = 0.0; }
-      } else if (dist > 400.0) {
+      } else if (distSq > 160000.0) {
         EVX[i] = 0.0;
       }
       EX[i] = EX[i] + EVX[i] * dt;
@@ -941,12 +966,12 @@ function updateEnemies(dt: number): void {
     // Player collision with enemy
     if (P[PI_DEAD] > 0.5 || P[PI_INV] > 0.0) continue;
 
-    const playerRect: Rect = { x: P[PI_X] + POX, y: P[PI_Y] + POY, width: PW, height: PH };
-    const enemyRect: Rect = { x: EX[i] + 4.0, y: EY[i] + 4.0, width: TILE_SIZE - 8.0, height: TILE_SIZE - 8.0 };
+    PRECT.x = P[PI_X] + POX; PRECT.y = P[PI_Y] + POY;
+    ERECT.x = EX[i] + 4.0; ERECT.y = EY[i] + 4.0; ERECT.width = TILE_SIZE - 8.0; ERECT.height = TILE_SIZE - 8.0;
 
-    if (checkCollisionRecs(playerRect, enemyRect)) {
+    if (checkCollisionRecs(PRECT, ERECT)) {
       // Check if stomping (player falling and above enemy)
-      if (P[PI_VY] > 0.0 && P[PI_PBOTY] < EY[i] + 12.0 && type < 2.5) {
+      if (P[PI_VY] > 0.0 && P[PI_PBOTY] < EY[i] + 12.0 && type < 3.5) {
         // Stomp! (flyers can't be stomped: type === E_FLYER check)
         if (type < 1.5 || type > 2.5) {
           // Walker or Chaser - can be stomped
@@ -982,15 +1007,15 @@ function drawEnemies(t: number): void {
 function updateCollectibles(dt: number, t: number): void {
   if (P[PI_DEAD] > 0.5 || GS[GI_FLAG] > 0.5) return;
 
-  const playerRect: Rect = { x: P[PI_X] + POX, y: P[PI_Y] + POY, width: PW, height: PH };
+  PRECT.x = P[PI_X] + POX; PRECT.y = P[PI_Y] + POY;
 
   for (let i = 0; i < MAX_COINS; i = i + 1) {
     if (CA[i] < 0.5) continue;
     const type = CT[i];
 
-    const itemRect: Rect = { x: CX[i] + 6.0, y: CY[i] + 6.0, width: 20.0, height: 20.0 };
+    ERECT.x = CX[i] + 6.0; ERECT.y = CY[i] + 6.0; ERECT.width = 20.0; ERECT.height = 20.0;
 
-    if (checkCollisionRecs(playerRect, itemRect)) {
+    if (checkCollisionRecs(PRECT, ERECT)) {
       if (type > 9.5 && type < 10.5) {
         // Coin
         CA[i] = 0.0;
@@ -1041,9 +1066,21 @@ function drawCollectibles(t: number): void {
       // Spring
       drawItemSprite(5, floorf(CX[i]), floorf(CY[i]));
     } else if (type > 19.5) {
-      // Flag
-      const frame = floorf(t * 3.0) % 2;
-      drawItemSprite(7 + frame, floorf(CX[i]), floorf(CY[i]));
+      // Flag — BIG visible marker
+      const fx = floorf(CX[i]);
+      const fy = floorf(CY[i]);
+      // Large bright green background glow
+      drawRect(fx - 8, fy - 128, 48, 160, FLAG_GLOW);
+      // Tall pole
+      drawRect(fx + 14, fy - 120, 5, 152, FLAG_POLE);
+      // Big red banner
+      drawRect(fx + 19, fy - 116, 32, 24, FLAG_BANNER);
+      const wave = Math.sin(t * 4.0) * 4.0;
+      drawTriangle(fx + 51, fy - 116, fx + 51, fy - 92, fx + 60 + floorf(wave), fy - 104, FLAG_BANNER2);
+      // Gold ball on top
+      drawCircle(fx + 16, fy - 124, 6, FLAG_BALL);
+      // "GOAL" text above
+      drawText("GOAL", fx - 2, fy - 148, 18, FLAG_TEXT);
     }
   }
 }
@@ -1081,37 +1118,38 @@ function drawSkyGradient(): void {
   const stripH = SCREEN_H / steps;
   for (let i = 0; i < steps; i = i + 1) {
     const t = i / (steps - 1.0);
-    const r = floorf(SKY_TOP.r + (SKY_BOT.r - SKY_TOP.r) * t);
-    const g = floorf(SKY_TOP.g + (SKY_BOT.g - SKY_TOP.g) * t);
-    const b = floorf(SKY_TOP.b + (SKY_BOT.b - SKY_TOP.b) * t);
-    drawRect(0, floorf(i * stripH), SCREEN_W, floorf(stripH) + 1, { r: r, g: g, b: b, a: 255 });
+    SKY_STRIP.r = floorf(SKY_TOP.r + (SKY_BOT.r - SKY_TOP.r) * t);
+    SKY_STRIP.g = floorf(SKY_TOP.g + (SKY_BOT.g - SKY_TOP.g) * t);
+    SKY_STRIP.b = floorf(SKY_TOP.b + (SKY_BOT.b - SKY_TOP.b) * t);
+    drawRect(0, floorf(i * stripH), SCREEN_W, floorf(stripH) + 1, SKY_STRIP);
   }
 }
 
 function drawParallaxBg(): void {
-  // Mountains (far layer, 0.2x scroll)
-  const mountScrollX = CAM[0] * 0.2;
-  const mountY = SCREEN_H - 200;
-  const mountW = 800;
-  // Tile horizontally
-  const mountStart = floorf(mountScrollX / mountW) * mountW;
-  for (let x = mountStart - mountW; x < mountStart + SCREEN_W + mountW; x = x + mountW) {
-    drawTexturePro(texBgMount,
-      { x: 0, y: 0, width: 800, height: 200 },
-      { x: floorf(x - mountScrollX), y: mountY, width: 800, height: 200 },
-      { x: 0, y: 0 }, 0.0, WHITE);
+  // Procedural parallax — colored triangles/rects (PNG backgrounds had artifacts)
+
+  // Far mountains (0.15x scroll)
+  const mx = CAM[0] * 0.15;
+  const mBase = SCREEN_H - 80;
+  let mi = 0.0;
+  while (mi < 12.0) {
+    const px = floorf(mi * 180.0 - (mx % 180.0) - 180.0);
+    const h = 80.0 + (mi % 3.0) * 40.0 + (mi % 2.0) * 25.0;
+    drawTriangle(px, mBase, px + 90, floorf(mBase - h), px + 180, mBase, MOUNT_COLOR);
+    mi = mi + 1.0;
   }
 
-  // Hills (near layer, 0.4x scroll)
-  const hillScrollX = CAM[0] * 0.4;
-  const hillY = SCREEN_H - 150;
-  const hillW = 800;
-  const hillStart = floorf(hillScrollX / hillW) * hillW;
-  for (let x = hillStart - hillW; x < hillStart + SCREEN_W + hillW; x = x + hillW) {
-    drawTexturePro(texBgHills,
-      { x: 0, y: 0, width: 800, height: 150 },
-      { x: floorf(x - hillScrollX), y: hillY, width: 800, height: 150 },
-      { x: 0, y: 0 }, 0.0, WHITE);
+  // Near hills (0.35x scroll)
+  const hx = CAM[0] * 0.35;
+  const hBase = SCREEN_H - 40;
+  let hi = 0.0;
+  while (hi < 10.0) {
+    const px = floorf(hi * 200.0 - (hx % 200.0) - 200.0);
+    const h = 50.0 + (hi % 3.0) * 20.0;
+    const w = 200.0;
+    // Approximate hill with overlapping triangles
+    drawTriangle(px, hBase, floorf(px + w * 0.5), floorf(hBase - h), px + floorf(w), hBase, HILL_COLOR);
+    hi = hi + 1.0;
   }
 }
 

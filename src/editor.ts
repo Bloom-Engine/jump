@@ -76,6 +76,28 @@ const PALETTE_BG: Color = { r: 35, g: 35, b: 48, a: 240 };
 const HIGHLIGHT: Color = { r: 255, g: 255, b: 100, a: 255 };
 const GRID_COLOR: Color = { r: 255, g: 255, b: 255, a: 30 };
 const CURSOR_COLOR: Color = { r: 255, g: 255, b: 255, a: 80 };
+const CANVAS_BG: Color = { r: 60, g: 70, b: 90, a: 255 };
+const LEVEL_BG: Color = { r: 100, g: 180, b: 255, a: 80 };
+const BTN_COLOR: Color = { r: 60, g: 60, b: 78, a: 255 };
+const BTN_HOVER: Color = { r: 80, g: 80, b: 100, a: 255 };
+const BTN_BORDER: Color = { r: 100, g: 100, b: 120, a: 255 };
+const BORDER_COLOR: Color = { r: 255, g: 255, b: 255, a: 60 };
+const LABEL_COLOR: Color = { r: 180, g: 180, b: 200, a: 200 };
+const DIM_LABEL: Color = { r: 140, g: 140, b: 160, a: 160 };
+const SEL_BG: Color = { r: 255, g: 255, b: 100, a: 40 };
+const ERASE_BG: Color = { r: 255, g: 100, b: 100, a: 40 };
+const ERASE_BORDER: Color = { r: 255, g: 100, b: 100, a: 255 };
+const ERASE_BTN: Color = { r: 180, g: 60, b: 60, a: 200 };
+const SPAWN_BODY: Color = { r: 80, g: 140, b: 230, a: 150 };
+const SPAWN_CAP: Color = { r: 200, g: 60, b: 50, a: 150 };
+const SPAWN_BORDER: Color = { r: 80, g: 200, b: 80, a: 180 };
+const SPAWN_BODY2: Color = { r: 80, g: 140, b: 230, a: 200 };
+const SPAWN_CAP2: Color = { r: 200, g: 60, b: 50, a: 200 };
+const DLG_OVERLAY: Color = { r: 0, g: 0, b: 0, a: 150 };
+const DLG_BG: Color = { r: 45, g: 45, b: 60, a: 250 };
+const DLG_BORDER: Color = { r: 100, g: 100, b: 130, a: 255 };
+const DLG_HINT: Color = { r: 160, g: 160, b: 180, a: 180 };
+const DLG_HOVER: Color = { r: 255, g: 255, b: 255, a: 25 };
 
 // ============================================================
 // STATE
@@ -113,6 +135,9 @@ const UNDO_INFO = [0.0, 0.0]; // [undoCount, redoCount]
 
 // Last paint position (for drag detection)
 const PAINT = [0.0, 0.0, 0.0]; // [lastTileX, lastTileY, painting]
+
+// Cursor tile position (computed once per frame, used by status bar)
+const CURSOR_TILE = [0.0, 0.0]; // [tileX, tileY]
 
 // Spawn point
 const SPAWN = [3.0, 12.0];
@@ -202,8 +227,8 @@ function drawEntityIcon(type: number, sx: number, sy: number, size: number): voi
     drawTexturePro(texItems, { x: 112, y: 0, width: 16, height: 16 }, { x: sx, y: sy, width: size, height: size }, { x: 0, y: 0 }, 0.0, WHITE);
   } else if (type === E_SPAWN) {
     // Draw a small player-like marker
-    drawRect(floorf(sx + size * 0.25), floorf(sy + size * 0.1), floorf(size * 0.5), floorf(size * 0.8), { r: 80, g: 140, b: 230, a: 200 });
-    drawRect(floorf(sx + size * 0.3), floorf(sy), floorf(size * 0.5), floorf(size * 0.25), { r: 200, g: 60, b: 50, a: 200 }); // cap
+    drawRect(floorf(sx + size * 0.25), floorf(sy + size * 0.1), floorf(size * 0.5), floorf(size * 0.8), SPAWN_BODY2);
+    drawRect(floorf(sx + size * 0.3), floorf(sy), floorf(size * 0.5), floorf(size * 0.25), SPAWN_CAP2); // cap
   }
 }
 
@@ -481,21 +506,21 @@ function drawToolbar(): void {
     const by = 6;
     const label = buttons[i];
     const hover = getMouseX() >= bx && getMouseX() < bx + btnW && getMouseY() >= by && getMouseY() < by + 28;
-    drawRect(bx, by, btnW, 28, hover ? { r: 80, g: 80, b: 100, a: 255 } : { r: 60, g: 60, b: 78, a: 255 });
-    drawRectLines(bx, by, btnW, 28, 1, { r: 100, g: 100, b: 120, a: 255 });
+    drawRect(bx, by, btnW, 28, hover ? BTN_HOVER : BTN_COLOR);
+    drawRectLines(bx, by, btnW, 28, 1, BTN_BORDER);
     drawText(label, bx + 8, by + 5, 18, WHITE);
   }
 
   // Zoom display
   const zoomText = "Zoom: " + floorf(ED[EDI_ZOOM] * 100.0).toString() + "%";
-  drawText(zoomText, CANVAS_W - 130, 12, 16, { r: 180, g: 180, b: 200, a: 200 });
+  drawText(zoomText, CANVAS_W - 130, 12, 16, LABEL_COLOR);
 
   // Grid toggle
   const gridText = ED[EDI_GRID] > 0.5 ? "[G]rid: ON" : "[G]rid: OFF";
-  drawText(gridText, CANVAS_W - 280, 12, 16, { r: 180, g: 180, b: 200, a: 200 });
+  drawText(gridText, CANVAS_W - 280, 12, 16, LABEL_COLOR);
 
   // Undo/redo info
-  drawText("Ctrl+Z/Y", 360, 12, 14, { r: 140, g: 140, b: 160, a: 160 });
+  drawText("Ctrl+Z/Y", 360, 12, 14, DIM_LABEL);
 }
 
 function drawPalette(): void {
@@ -511,7 +536,7 @@ function drawPalette(): void {
     const isSelected = ED[EDI_MODE] < 0.5 && floorf(ED[EDI_TILE]) === (i + 1);
 
     if (isSelected) {
-      drawRect(px + 2, ty - 2, PALETTE_W - 4, 36, { r: 255, g: 255, b: 100, a: 40 });
+      drawRect(px + 2, ty - 2, PALETTE_W - 4, 36, SEL_BG);
       drawRectLines(px + 2, ty - 2, PALETTE_W - 4, 36, 1, HIGHLIGHT);
     }
 
@@ -531,7 +556,7 @@ function drawPalette(): void {
     const isSelected = ED[EDI_MODE] > 0.5 && ED[EDI_MODE] < 1.5 && floorf(ED[EDI_ENT]) === entTypes[i];
 
     if (isSelected) {
-      drawRect(px + 2, ey - 2, PALETTE_W - 4, 30, { r: 255, g: 255, b: 100, a: 40 });
+      drawRect(px + 2, ey - 2, PALETTE_W - 4, 30, SEL_BG);
       drawRectLines(px + 2, ey - 2, PALETTE_W - 4, 30, 1, HIGHLIGHT);
     }
 
@@ -543,10 +568,10 @@ function drawPalette(): void {
   const eraseY = entY + 22 + 8 * 32 + 8;
   const isErase = ED[EDI_MODE] > 1.5;
   if (isErase) {
-    drawRect(px + 2, eraseY - 2, PALETTE_W - 4, 30, { r: 255, g: 100, b: 100, a: 40 });
-    drawRectLines(px + 2, eraseY - 2, PALETTE_W - 4, 30, 1, { r: 255, g: 100, b: 100, a: 255 });
+    drawRect(px + 2, eraseY - 2, PALETTE_W - 4, 30, ERASE_BG);
+    drawRectLines(px + 2, eraseY - 2, PALETTE_W - 4, 30, 1, ERASE_BORDER);
   }
-  drawRect(px + 8, eraseY, 26, 26, { r: 180, g: 60, b: 60, a: 200 });
+  drawRect(px + 8, eraseY, 26, 26, ERASE_BTN);
   drawText("X", px + 15, eraseY + 4, 18, WHITE);
   drawText("Erase", px + 40, eraseY + 4, 14, WHITE);
 }
@@ -557,56 +582,73 @@ function drawStatusBar(): void {
 
   let statusText = FNAME[0].length > 0 ? FNAME[0] : "(unsaved)";
   if (ED[EDI_MOD] > 0.5) statusText = statusText + " *";
-  drawText(statusText, 10, sy + 7, 14, { r: 180, g: 180, b: 200, a: 200 });
+  drawText(statusText, 10, sy + 7, 14, LABEL_COLOR);
 
   const sizeText = floorf(ED[EDI_LW]).toString() + " x " + floorf(ED[EDI_LH]).toString();
-  drawText(sizeText, 300, sy + 7, 14, { r: 180, g: 180, b: 200, a: 200 });
+  drawText(sizeText, 300, sy + 7, 14, LABEL_COLOR);
 
-  // Cursor world position
-  const mouseWorld = getScreenToWorld2D(
-    { x: getMouseX(), y: getMouseY() },
-    { offset: { x: CANVAS_W * 0.5, y: TOOLBAR_H + CANVAS_H * 0.5 }, target: { x: CAM[0], y: CAM[1] }, rotation: 0.0, zoom: ED[EDI_ZOOM] },
-  );
-  const tileX = floorf(mouseWorld.x / TILE_SIZE);
-  const tileY = floorf(mouseWorld.y / TILE_SIZE);
-  const posText = "Tile: " + tileX.toString() + "," + tileY.toString();
-  drawText(posText, 480, sy + 7, 14, { r: 180, g: 180, b: 200, a: 200 });
+  // Cursor tile position (computed in main loop)
+  const posText = "Tile: " + floorf(CURSOR_TILE[0]).toString() + "," + floorf(CURSOR_TILE[1]).toString();
+  drawText(posText, 480, sy + 7, 14, LABEL_COLOR);
 }
 
 function drawGrid(cam: Camera2D): void {
   if (ED[EDI_GRID] < 0.5) return;
   const w = floorf(ED[EDI_LW]);
   const h = floorf(ED[EDI_LH]);
+  const zm = ED[EDI_ZOOM];
+  const ghw = (CANVAS_W * 0.5) / zm + TILE_SIZE;
+  const ghh = (CANVAS_H * 0.5) / zm + TILE_SIZE;
+  let gsc = floorf((CAM[0] - ghw) / TILE_SIZE);
+  let gec = floorf((CAM[0] + ghw) / TILE_SIZE) + 1;
+  let gsr = floorf((CAM[1] - ghh) / TILE_SIZE);
+  let ger = floorf((CAM[1] + ghh) / TILE_SIZE) + 1;
+  if (gsc < 0) gsc = 0;
+  if (gsr < 0) gsr = 0;
+  if (gec > w) gec = w;
+  if (ger > h) ger = h;
+  const gridTop = gsr * TILE_SIZE;
+  const gridBot = ger * TILE_SIZE;
+  const gridLeft = gsc * TILE_SIZE;
+  const gridRight = gec * TILE_SIZE;
   // Vertical lines
-  for (let x = 0; x <= w; x = x + 1) {
-    drawLine(x * TILE_SIZE, 0, x * TILE_SIZE, h * TILE_SIZE, 1, GRID_COLOR);
+  for (let x = gsc; x <= gec; x = x + 1) {
+    drawLine(x * TILE_SIZE, gridTop, x * TILE_SIZE, gridBot, 1, GRID_COLOR);
   }
   // Horizontal lines
-  for (let y = 0; y <= h; y = y + 1) {
-    drawLine(0, y * TILE_SIZE, w * TILE_SIZE, y * TILE_SIZE, 1, GRID_COLOR);
+  for (let y = gsr; y <= ger; y = y + 1) {
+    drawLine(gridLeft, y * TILE_SIZE, gridRight, y * TILE_SIZE, 1, GRID_COLOR);
   }
 }
 
 function drawLevelBorder(): void {
   const w = ED[EDI_LW] * TILE_SIZE;
   const h = ED[EDI_LH] * TILE_SIZE;
-  drawRectLines(0, 0, floorf(w), floorf(h), 2, { r: 255, g: 255, b: 255, a: 60 });
+  drawRectLines(0, 0, floorf(w), floorf(h), 2, BORDER_COLOR);
 }
 
 function drawSpawnMarker(): void {
   const sx = SPAWN[0] * TILE_SIZE;
   const sy = SPAWN[1] * TILE_SIZE;
-  drawRect(floorf(sx + 8), floorf(sy + 2), 16, 28, { r: 80, g: 140, b: 230, a: 150 });
-  drawRect(floorf(sx + 6), floorf(sy - 2), 20, 8, { r: 200, g: 60, b: 50, a: 150 }); // cap
-  drawRectLines(floorf(sx), floorf(sy), TILE_SIZE, TILE_SIZE, 1, { r: 80, g: 200, b: 80, a: 180 });
+  drawRect(floorf(sx + 8), floorf(sy + 2), 16, 28, SPAWN_BODY);
+  drawRect(floorf(sx + 6), floorf(sy - 2), 20, 8, SPAWN_CAP); // cap
+  drawRectLines(floorf(sx), floorf(sy), TILE_SIZE, TILE_SIZE, 1, SPAWN_BORDER);
   drawText("P", floorf(sx + 11), floorf(sy + 8), 16, WHITE);
 }
 
 function drawEntitiesInLevel(): void {
+  const zm = ED[EDI_ZOOM];
+  const ehw = (CANVAS_W * 0.5) / zm + TILE_SIZE;
+  const ehh = (CANVAS_H * 0.5) / zm + TILE_SIZE;
+  const eMinX = CAM[0] - ehw;
+  const eMaxX = CAM[0] + ehw;
+  const eMinY = CAM[1] - ehh;
+  const eMaxY = CAM[1] + ehh;
   for (let i = 0; i < MAX_ENTITIES; i = i + 1) {
     if (ENT_A[i] < 0.5) continue;
     const ex = ENT_X[i] * TILE_SIZE;
     const ey = ENT_Y[i] * TILE_SIZE;
+    if (ex < eMinX || ex > eMaxX || ey < eMinY || ey > eMaxY) continue;
     drawEntityIcon(floorf(ENT_T[i]), floorf(ex), floorf(ey), TILE_SIZE);
   }
 }
@@ -621,22 +663,22 @@ function drawOpenDialog(): void {
   const dlgX = floorf((SCREEN_W - dlgW) / 2);
   const dlgY = floorf((SCREEN_H - dlgH) / 2);
 
-  drawRect(0, 0, SCREEN_W, SCREEN_H, { r: 0, g: 0, b: 0, a: 150 });
-  drawRect(dlgX, dlgY, dlgW, dlgH, { r: 45, g: 45, b: 60, a: 250 });
-  drawRectLines(dlgX, dlgY, dlgW, dlgH, 2, { r: 100, g: 100, b: 130, a: 255 });
+  drawRect(0, 0, SCREEN_W, SCREEN_H, DLG_OVERLAY);
+  drawRect(dlgX, dlgY, dlgW, dlgH, DLG_BG);
+  drawRectLines(dlgX, dlgY, dlgW, dlgH, 2, DLG_BORDER);
 
   drawText("Open Level", dlgX + 20, dlgY + 12, 22, WHITE);
-  drawText("ESC to cancel", dlgX + dlgW - 130, dlgY + 16, 14, { r: 160, g: 160, b: 180, a: 180 });
+  drawText("ESC to cancel", dlgX + dlgW - 130, dlgY + 16, 14, DLG_HINT);
 
   for (let i = 0; i < FILE_NAMES.length; i = i + 1) {
     const fy = dlgY + 50 + i * 32;
     if (fy > dlgY + dlgH - 40) break;
     const hover = getMouseX() >= dlgX + 10 && getMouseX() < dlgX + dlgW - 10 && getMouseY() >= fy && getMouseY() < fy + 28;
     if (hover) {
-      drawRect(dlgX + 10, fy, dlgW - 20, 28, { r: 255, g: 255, b: 255, a: 25 });
+      drawRect(dlgX + 10, fy, dlgW - 20, 28, DLG_HOVER);
     }
     drawText(FILE_NAMES[i], dlgX + 20, fy + 5, 18, WHITE);
-    drawText(FILE_LIST[i], dlgX + 200, fy + 8, 12, { r: 140, g: 140, b: 160, a: 160 });
+    drawText(FILE_LIST[i], dlgX + 200, fy + 8, 12, DIM_LABEL);
   }
 }
 
@@ -881,6 +923,11 @@ while (!windowShouldClose()) {
     camera.target.y = floorf(CAM[1]);
     camera.zoom = ED[EDI_ZOOM];
     handleCanvasInput(camera);
+
+    // Compute cursor tile position once per frame
+    const curWorld = getScreenToWorld2D({ x: getMouseX(), y: getMouseY() }, camera);
+    CURSOR_TILE[0] = floorf(curWorld.x / TILE_SIZE);
+    CURSOR_TILE[1] = floorf(curWorld.y / TILE_SIZE);
   }
 
   // Draw
@@ -888,19 +935,31 @@ while (!windowShouldClose()) {
   clearBackground(DARK_BG);
 
   // Canvas area background
-  drawRect(0, TOOLBAR_H, CANVAS_W, CANVAS_H, { r: 60, g: 70, b: 90, a: 255 });
+  drawRect(0, TOOLBAR_H, CANVAS_W, CANVAS_H, CANVAS_BG);
 
   // World view
   beginMode2D(camera);
 
   // Level background
-  drawRect(0, 0, floorf(ED[EDI_LW] * TILE_SIZE), floorf(ED[EDI_LH] * TILE_SIZE), { r: 100, g: 180, b: 255, a: 80 });
+  drawRect(0, 0, floorf(ED[EDI_LW] * TILE_SIZE), floorf(ED[EDI_LH] * TILE_SIZE), LEVEL_BG);
 
-  // Draw tiles
+  // Draw tiles (viewport culled)
   const w = floorf(ED[EDI_LW]);
   const h = floorf(ED[EDI_LH]);
-  for (let ty = 0; ty < h; ty = ty + 1) {
-    for (let tx = 0; tx < w; tx = tx + 1) {
+  const zoom = ED[EDI_ZOOM];
+  const vhw = (CANVAS_W * 0.5) / zoom + TILE_SIZE;
+  const vhh = (CANVAS_H * 0.5) / zoom + TILE_SIZE;
+  let sc = floorf((CAM[0] - vhw) / TILE_SIZE);
+  let ec = floorf((CAM[0] + vhw) / TILE_SIZE) + 1;
+  let sr = floorf((CAM[1] - vhh) / TILE_SIZE);
+  let er = floorf((CAM[1] + vhh) / TILE_SIZE) + 1;
+  if (sc < 0) sc = 0;
+  if (sr < 0) sr = 0;
+  if (ec >= w) ec = w - 1;
+  if (er >= h) er = h - 1;
+
+  for (let ty = sr; ty <= er; ty = ty + 1) {
+    for (let tx = sc; tx <= ec; tx = tx + 1) {
       const tile = getTile(tx, ty);
       if (tile > T_AIR) {
         drawTileSprite(tile, tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE);
