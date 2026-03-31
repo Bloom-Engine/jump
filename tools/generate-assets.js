@@ -1818,8 +1818,86 @@ function main() {
   generateSelect();
 
   console.log('');
+  console.log('Generating app icon...');
+  generateAppIcon();
+
+  console.log('');
   console.log('All assets generated successfully!');
   console.log('');
+}
+
+// ───────────────────────────────────────────────────────
+// App icon (1024x1024) — pixel art style
+// ───────────────────────────────────────────────────────
+function generateAppIcon() {
+  const S = 1024;
+  const img = createImageBuffer(S, S);
+
+  // Sky gradient background
+  for (let y = 0; y < S; y++) {
+    const t = y / S;
+    const r = Math.floor(100 + (180 - 100) * t);
+    const g = Math.floor(180 + (220 - 180) * t);
+    const b = 255;
+    for (let x = 0; x < S; x++) {
+      setPixel(img, x, y, r, g, b, 255);
+    }
+  }
+
+  // Green ground
+  fillRect(img, 0, S * 0.72, S, S * 0.28, 80, 180, 60, 255);
+  fillRect(img, 0, S * 0.72, S, S * 0.04, 100, 200, 80, 255);
+
+  // Simple pixel-art player character (centered, large)
+  const px = S * 0.38;
+  const py = S * 0.28;
+  const ps = S * 0.06; // pixel size for blocky look
+
+  // Body (blue)
+  for (let by = 3; by < 8; by++) {
+    for (let bx = 1; bx < 4; bx++) {
+      fillRect(img, px + bx * ps, py + by * ps, ps, ps, 60, 100, 200, 255);
+    }
+  }
+  // Head (skin)
+  for (let hy = 0; hy < 3; hy++) {
+    for (let hx = 1; hx < 4; hx++) {
+      fillRect(img, px + hx * ps, py + hy * ps, ps, ps, 240, 190, 150, 255);
+    }
+  }
+  // Eyes
+  fillRect(img, px + 1.5 * ps, py + 1 * ps, ps * 0.5, ps * 0.5, 40, 40, 60, 255);
+  fillRect(img, px + 3 * ps, py + 1 * ps, ps * 0.5, ps * 0.5, 40, 40, 60, 255);
+  // Feet
+  fillRect(img, px + 1 * ps, py + 8 * ps, ps, ps, 140, 80, 40, 255);
+  fillRect(img, px + 3 * ps, py + 8 * ps, ps, ps, 140, 80, 40, 255);
+
+  // Title text area — draw "BJ" as big pixel letters
+  // B
+  const lx = S * 0.15;
+  const ly = S * 0.78;
+  const ls = S * 0.025;
+  // B vertical bar
+  for (let i = 0; i < 5; i++) fillRect(img, lx, ly + i * ls, ls, ls, 255, 255, 255, 220);
+  // B bumps
+  fillRect(img, lx + ls, ly, ls, ls, 255, 255, 255, 220);
+  fillRect(img, lx + ls, ly + 2 * ls, ls, ls, 255, 255, 255, 220);
+  fillRect(img, lx + ls, ly + 4 * ls, ls, ls, 255, 255, 255, 220);
+  fillRect(img, lx + 2 * ls, ly + 1 * ls, ls, ls, 255, 255, 255, 220);
+  fillRect(img, lx + 2 * ls, ly + 3 * ls, ls, ls, 255, 255, 255, 220);
+
+  // J
+  const jx = lx + 4 * ls;
+  for (let i = 0; i < 5; i++) fillRect(img, jx + 2 * ls, ly + i * ls, ls, ls, 255, 255, 255, 220);
+  fillRect(img, jx, ly, 3 * ls, ls, 255, 255, 255, 220);
+  fillRect(img, jx, ly + 4 * ls, 2 * ls, ls, 255, 255, 255, 220);
+  fillRect(img, jx, ly + 3 * ls, ls, ls, 255, 255, 255, 220);
+
+  // Coin (yellow circle)
+  drawCircle(img, Math.floor(S * 0.72), Math.floor(S * 0.45), Math.floor(S * 0.06), 255, 220, 50, 255, true);
+  drawCircle(img, Math.floor(S * 0.72), Math.floor(S * 0.45), Math.floor(S * 0.06), 200, 170, 30, 255, false);
+
+  savePNG(img, 'assets/icon.png');
 }
 
 main();

@@ -11,6 +11,9 @@ import {
   getScreenWidth, getScreenHeight, closeWindow,
   beginMode2D, endMode2D, getScreenToWorld2D,
   writeFile, readFile, fileExists,
+  isMobile, isTV, getPlatform,
+  getTouchX, getTouchY, getTouchCount,
+  isGamepadAvailable, getGamepadAxis, isGamepadButtonPressed, isGamepadButtonDown,
 } from "bloom/core";
 import { Color, Key, Camera2D, MouseButton } from "bloom/core";
 import {
@@ -31,11 +34,65 @@ import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
 import { Rect, Texture, Sound } from "bloom/core";
 
 // ============================================================
+// PLATFORM DETECTION
+// ============================================================
+
+// Platform detection — Perry-safe numeric checks
+// Platform: 0=unknown, 1=macos, 2=ios, 3=windows, 4=linux, 5=android, 6=tvos
+const PLATF = [0.0, 0.0, 0.0]; // [platform, isMobile, isTV]
+PLATF[0] = getPlatform();
+if (PLATF[0] > 1.5 && PLATF[0] < 2.5) PLATF[1] = 1.0;  // iOS
+if (PLATF[0] > 4.5 && PLATF[0] < 5.5) PLATF[1] = 1.0;  // Android
+if (PLATF[0] > 5.5 && PLATF[0] < 6.5) PLATF[2] = 1.0;  // tvOS
+const MOBILE = PLATF[1];
+const TV = PLATF[2];
+
+// ============================================================
+// TOUCH / GAMEPAD INPUT STATE (Perry-safe const arrays)
+// ============================================================
+
+// Touch state: [joyActive, joyX, joyY, jumpDown, jumpPressed, pausePressed, prevJump]
+const TCH = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+const TI_JOY_ACTIVE = 0;
+const TI_JOY_X = 1;
+const TI_JOY_Y = 2;
+const TI_JUMP_DOWN = 3;
+const TI_JUMP_PRESSED = 4;
+const TI_PAUSE_PRESSED = 5;
+const TI_PREV_JUMP = 6;
+
+// Touch control layout
+const TOUCH_JOY_RADIUS = 70.0;
+const TOUCH_JOY_X_POS = 180.0;
+const TOUCH_JOY_Y_OFFSET = 200.0;
+const TOUCH_JUMP_RADIUS = 60.0;
+const TOUCH_JUMP_X_OFFSET = 160.0;
+const TOUCH_JUMP_Y_OFFSET = 180.0;
+const TOUCH_PAUSE_SIZE = 44.0;
+const TOUCH_PAUSE_X_OFFSET = 60.0;
+const TOUCH_PAUSE_Y_OFFSET = 60.0;
+
+// Gamepad state: [moveX, jump, pause, up, down, confirm]
+const GP = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+const GP_MOVE_X = 0;
+const GP_JUMP = 1;
+const GP_PAUSE = 2;
+const GP_UP = 3;
+const GP_DOWN = 4;
+const GP_CONFIRM = 5;
+const GP_DEADZONE = 0.15;
+
+// ============================================================
 // CONSTANTS
 // ============================================================
 
 const SCREEN_W = 800;
 const SCREEN_H = 600;
+const DESIGN_H = 600.0; // UI reference height for scaling
+
+// UI scale state [uiScale] — updated each frame from screen size
+const UI = [1.0];
+const UI_SCALE = 0;
 const TILE_SRC = 16;   // sprite sheet tile size
 const TILE_SIZE = 32;   // display tile size (2x)
 const SCALE = 2.0;
@@ -172,25 +229,20 @@ initWindow(SCREEN_W, SCREEN_H, "Bloom Jump");
 setTargetFPS(60);
 initAudioDevice();
 
-// Load textures — stage in parallel on background threads, then commit on main thread
-const TEX_PATHS = [
+// Show loading screen
+beginDrawing();
+clearBackground(LOADING_BG);
+drawText("Loading...", getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, LOADING_TEXT);
+endDrawing();
+
+// Stage all textures on background threads (parallel decode), then commit to GPU
+const staged = stageTextures([
   "assets/sprites/tileset.png",
   "assets/sprites/player.png",
   "assets/sprites/enemies.png",
   "assets/sprites/items.png",
   "assets/sprites/ui.png",
-];
-
-// Show loading screen
-beginDrawing();
-clearBackground(LOADING_BG);
-drawText("Loading...", SCREEN_W / 2 - 60, SCREEN_H / 2 - 10, 24, LOADING_TEXT);
-endDrawing();
-
-// Stage all textures on background threads (parallel decode)
-const staged = stageTextures(TEX_PATHS);
-
-// Commit to GPU on main thread
+]);
 const texTileset = commitTexture(staged[0]);
 setTextureFilter(texTileset, FILTER_NEAREST);
 const texPlayer = commitTexture(staged[1]);
@@ -256,6 +308,113 @@ function setTile(tx: number, ty: number, val: number): void {
   if (tx < 0 || tx >= LVL[0] || ty < 0 || ty >= LVL[1]) return;
   const idx = floorf(ty) * floorf(LVL[0]) + floorf(tx);
   if (idx >= 0 && idx < TILES.length) TILES[idx] = val;
+}
+
+// ============================================================
+// TOUCH / GAMEPAD INPUT PROCESSING
+// ============================================================
+
+function updateTouchInput(sw: number, sh: number): void {
+  // Save previous jump state for edge detection
+  TCH[TI_PREV_JUMP] = TCH[TI_JUMP_DOWN];
+
+  // Reset per-frame values
+  TCH[TI_JOY_ACTIVE] = 0.0;
+  TCH[TI_JOY_X] = 0.0;
+  TCH[TI_JOY_Y] = 0.0;
+  TCH[TI_JUMP_DOWN] = 0.0;
+  TCH[TI_JUMP_PRESSED] = 0.0;
+  TCH[TI_PAUSE_PRESSED] = 0.0;
+
+  if (MOBILE < 0.5) return;
+
+  const s = UI[UI_SCALE];
+  const tc = getTouchCount();
+  const joyBaseX = TOUCH_JOY_X_POS * s;
+  const joyBaseY = sh - TOUCH_JOY_Y_OFFSET * s;
+  const jumpBaseX = sw - TOUCH_JUMP_X_OFFSET * s;
+  const jumpBaseY = sh - TOUCH_JUMP_Y_OFFSET * s;
+  const pauseBaseX = sw - TOUCH_PAUSE_X_OFFSET * s;
+  const pauseBaseY = TOUCH_PAUSE_Y_OFFSET * s;
+  const joyRadiusScaled = TOUCH_JOY_RADIUS * s;
+  const jumpRadiusScaled = TOUCH_JUMP_RADIUS * s;
+  const pauseSizeScaled = TOUCH_PAUSE_SIZE * s;
+
+  for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
+    const tx = getTouchX(ti);
+    const ty = getTouchY(ti);
+
+    // Left side of screen = joystick zone
+    if (tx < sw * 0.4) {
+      const dx = tx - joyBaseX;
+      const dy = ty - joyBaseY;
+      const distSq = dx * dx + dy * dy;
+      if (distSq > 25.0) {
+        let adx = dx; if (adx < 0.0) adx = 0.0 - adx;
+        let ady = dy; if (ady < 0.0) ady = 0.0 - ady;
+        let dist = adx;
+        if (ady > adx) { dist = ady + adx * 0.4; }
+        else { dist = adx + ady * 0.4; }
+        if (dist < 1.0) dist = 1.0;
+        let clampDist = dist;
+        if (clampDist > joyRadiusScaled) clampDist = joyRadiusScaled;
+        TCH[TI_JOY_X] = (dx / dist) * (clampDist / joyRadiusScaled);
+        TCH[TI_JOY_Y] = (dy / dist) * (clampDist / joyRadiusScaled);
+        TCH[TI_JOY_ACTIVE] = 1.0;
+      }
+    }
+
+    // Right bottom = jump button zone
+    const jdx = tx - jumpBaseX;
+    const jdy = ty - jumpBaseY;
+    if (jdx * jdx + jdy * jdy < jumpRadiusScaled * jumpRadiusScaled) {
+      TCH[TI_JUMP_DOWN] = 1.0;
+    }
+
+    // Top-right = pause button zone
+    const pdx = tx - pauseBaseX;
+    const pdy = ty - pauseBaseY;
+    if (pdx * pdx + pdy * pdy < pauseSizeScaled * pauseSizeScaled) {
+      TCH[TI_PAUSE_PRESSED] = 1.0;
+    }
+  }
+
+  // Edge detection: jump pressed this frame (rising edge)
+  if (TCH[TI_JUMP_DOWN] > 0.5 && TCH[TI_PREV_JUMP] < 0.5) {
+    TCH[TI_JUMP_PRESSED] = 1.0;
+  }
+}
+
+function updateGamepadInput(): void {
+  GP[GP_MOVE_X] = 0.0;
+  GP[GP_JUMP] = 0.0;
+  GP[GP_PAUSE] = 0.0;
+  GP[GP_UP] = 0.0;
+  GP[GP_DOWN] = 0.0;
+  GP[GP_CONFIRM] = 0.0;
+
+  if (!isGamepadAvailable()) return;
+
+  // Left stick / d-pad horizontal
+  const lx = getGamepadAxis(0);
+  if (lx > GP_DEADZONE) GP[GP_MOVE_X] = 1.0;
+  if (lx < 0.0 - GP_DEADZONE) GP[GP_MOVE_X] = 0.0 - 1.0;
+
+  // Left stick / d-pad vertical (for menus)
+  const ly = getGamepadAxis(1);
+  if (ly < 0.0 - GP_DEADZONE) GP[GP_UP] = 1.0;
+  if (ly > GP_DEADZONE) GP[GP_DOWN] = 1.0;
+
+  // Button A (index 0) = jump / confirm
+  if (isGamepadButtonPressed(0)) {
+    GP[GP_JUMP] = 1.0;
+    GP[GP_CONFIRM] = 1.0;
+  }
+
+  // Menu button (index 7)
+  if (isGamepadButtonPressed(7)) {
+    GP[GP_PAUSE] = 1.0;
+  }
 }
 
 // ============================================================
@@ -803,8 +962,18 @@ function updatePlayer(dt: number): void {
 
   // --- Input ---
   let moveDir = 0.0;
+  // Keyboard
   if (isKeyDown(Key.LEFT) || isKeyDown(Key.A)) moveDir = moveDir - 1.0;
   if (isKeyDown(Key.RIGHT) || isKeyDown(Key.D)) moveDir = moveDir + 1.0;
+  // Touch joystick
+  if (TCH[TI_JOY_X] < -0.3) moveDir = moveDir - 1.0;
+  if (TCH[TI_JOY_X] > 0.3) moveDir = moveDir + 1.0;
+  // Gamepad
+  if (GP[GP_MOVE_X] > 0.5) moveDir = moveDir + 1.0;
+  if (GP[GP_MOVE_X] < -0.5) moveDir = moveDir - 1.0;
+  // Clamp
+  if (moveDir > 1.0) moveDir = 1.0;
+  if (moveDir < -1.0) moveDir = -1.0;
 
   // Facing
   if (moveDir > 0.5) P[PI_FACE] = 1.0;
@@ -814,6 +983,8 @@ function updatePlayer(dt: number): void {
   if (isKeyPressed(Key.SPACE) || isKeyPressed(Key.UP) || isKeyPressed(Key.W)) {
     P[PI_JBUF] = JUMP_BUFFER;
   }
+  if (TCH[TI_JUMP_PRESSED] > 0.5) P[PI_JBUF] = JUMP_BUFFER;
+  if (GP[GP_JUMP] > 0.5) P[PI_JBUF] = JUMP_BUFFER;
 
   // --- Horizontal movement ---
   const accel = P[PI_GND] > 0.5 ? ACCEL_GROUND : ACCEL_AIR;
@@ -847,7 +1018,11 @@ function updatePlayer(dt: number): void {
   }
 
   // Variable jump height (cut jump short on release)
-  if (P[PI_VY] < 0.0 && !isKeyDown(Key.SPACE) && !isKeyDown(Key.UP) && !isKeyDown(Key.W)) {
+  let jumpHeld = 0.0;
+  if (isKeyDown(Key.SPACE) || isKeyDown(Key.UP) || isKeyDown(Key.W)) jumpHeld = 1.0;
+  if (TCH[TI_JUMP_DOWN] > 0.5) jumpHeld = 1.0;
+  if (isGamepadAvailable()) { if (isGamepadButtonDown(0)) jumpHeld = 1.0; }
+  if (P[PI_VY] < 0.0 && jumpHeld < 0.5) {
     P[PI_VY] = P[PI_VY] * 0.9; // dampen upward velocity
   }
 
@@ -1089,7 +1264,10 @@ function drawCollectibles(t: number): void {
 // CAMERA
 // ============================================================
 
-function updateCamera(dt: number): void {
+function updateCamera(dt: number, sw: number, sh: number): void {
+  // Set zoom to UI scale so game world fills the screen proportionally
+  CAM[2] = UI[UI_SCALE];
+
   const lookAhead = P[PI_FACE] > 0.5 ? 60.0 : -60.0;
   const targetX = P[PI_X] + TILE_SIZE * 0.5 + lookAhead;
   const targetY = P[PI_Y] - 20.0;
@@ -1098,8 +1276,8 @@ function updateCamera(dt: number): void {
   CAM[1] = CAM[1] + (targetY - CAM[1]) * 6.0 * dt;
 
   // Clamp to level bounds
-  const halfW = SCREEN_W * 0.5 / CAM[2];
-  const halfH = SCREEN_H * 0.5 / CAM[2];
+  const halfW = sw * 0.5 / CAM[2];
+  const halfH = sh * 0.5 / CAM[2];
   const levelW = LVL[0] * TILE_SIZE;
   const levelH = LVL[1] * TILE_SIZE;
 
@@ -1113,26 +1291,30 @@ function updateCamera(dt: number): void {
 // DRAWING
 // ============================================================
 
-function drawSkyGradient(): void {
-  const steps = 20;
-  const stripH = SCREEN_H / steps;
+function drawSkyGradient(sw: number, sh: number): void {
+  // Use fewer strips on mobile to reduce fill rate
+  const steps = MOBILE > 0.5 ? 6 : 20;
+  const stripH = sh / steps;
   for (let i = 0; i < steps; i = i + 1) {
     const t = i / (steps - 1.0);
     SKY_STRIP.r = floorf(SKY_TOP.r + (SKY_BOT.r - SKY_TOP.r) * t);
     SKY_STRIP.g = floorf(SKY_TOP.g + (SKY_BOT.g - SKY_TOP.g) * t);
     SKY_STRIP.b = floorf(SKY_TOP.b + (SKY_BOT.b - SKY_TOP.b) * t);
-    drawRect(0, floorf(i * stripH), SCREEN_W, floorf(stripH) + 1, SKY_STRIP);
+    drawRect(0, floorf(i * stripH), sw, floorf(stripH) + 1, SKY_STRIP);
   }
 }
 
-function drawParallaxBg(): void {
+function drawParallaxBg(sw: number, sh: number): void {
   // Procedural parallax — colored triangles/rects (PNG backgrounds had artifacts)
+  // Fewer iterations on mobile to reduce draw calls
+  const mCount = MOBILE > 0.5 ? 8.0 : 12.0;
+  const hCount = MOBILE > 0.5 ? 6.0 : 10.0;
 
   // Far mountains (0.15x scroll)
   const mx = CAM[0] * 0.15;
-  const mBase = SCREEN_H - 80;
+  const mBase = sh - 80;
   let mi = 0.0;
-  while (mi < 12.0) {
+  while (mi < mCount) {
     const px = floorf(mi * 180.0 - (mx % 180.0) - 180.0);
     const h = 80.0 + (mi % 3.0) * 40.0 + (mi % 2.0) * 25.0;
     drawTriangle(px, mBase, px + 90, floorf(mBase - h), px + 180, mBase, MOUNT_COLOR);
@@ -1141,9 +1323,9 @@ function drawParallaxBg(): void {
 
   // Near hills (0.35x scroll)
   const hx = CAM[0] * 0.35;
-  const hBase = SCREEN_H - 40;
+  const hBase = sh - 40;
   let hi = 0.0;
-  while (hi < 10.0) {
+  while (hi < hCount) {
     const px = floorf(hi * 200.0 - (hx % 200.0) - 200.0);
     const h = 50.0 + (hi % 3.0) * 20.0;
     const w = 200.0;
@@ -1153,11 +1335,11 @@ function drawParallaxBg(): void {
   }
 }
 
-function drawVisibleTiles(): void {
+function drawVisibleTiles(sw: number, sh: number): void {
   const camX = CAM[0];
   const camY = CAM[1];
-  const halfW = SCREEN_W * 0.5 / CAM[2] + TILE_SIZE;
-  const halfH = SCREEN_H * 0.5 / CAM[2] + TILE_SIZE;
+  const halfW = sw * 0.5 / CAM[2] + TILE_SIZE;
+  const halfH = sh * 0.5 / CAM[2] + TILE_SIZE;
 
   const startCol = floorf((camX - halfW) / TILE_SIZE);
   const endCol = floorf((camX + halfW) / TILE_SIZE) + 1;
@@ -1207,84 +1389,117 @@ function drawPlayerCharacter(t: number): void {
   );
 }
 
-function drawHUD(): void {
+function drawHUD(sw: number, sh: number): void {
+  const s = UI[UI_SCALE];
+  const iconSize = floorf(32.0 * s);
+  const textSize = floorf(22.0 * s);
+  const margin = floorf(10.0 * s);
+
   // Hearts
   for (let i = 0; i < 3; i = i + 1) {
-    const hx = 10 + i * 36;
-    const hy = 10;
+    const hx = margin + floorf(i * 36.0 * s);
+    const hy = margin;
     if (i < P[PI_HP]) {
-      drawSpriteFromSheet(texUI, 0, 0, 16, 16, hx, hy, 32, 32, WHITE);
+      drawSpriteFromSheet(texUI, 0, 0, 16, 16, hx, hy, iconSize, iconSize, WHITE);
     } else {
-      drawSpriteFromSheet(texUI, 16, 0, 16, 16, hx, hy, 32, 32, WHITE);
+      drawSpriteFromSheet(texUI, 16, 0, 16, 16, hx, hy, iconSize, iconSize, WHITE);
     }
   }
 
   // Coin count
-  drawSpriteFromSheet(texUI, 32, 0, 16, 16, 130, 14, 24, 24, WHITE);
-  drawText("x" + floorf(P[PI_COINS]).toString(), 158, 16, 22, WHITE);
+  const coinX = floorf(130.0 * s);
+  const coinIconSize = floorf(24.0 * s);
+  drawSpriteFromSheet(texUI, 32, 0, 16, 16, coinX, floorf(14.0 * s), coinIconSize, coinIconSize, WHITE);
+  drawText("x" + floorf(P[PI_COINS]).toString(), floorf(158.0 * s), floorf(16.0 * s), textSize, WHITE);
 
   // Gem count
   if (P[PI_GEMS] > 0.0) {
-    drawItemSprite(4, 220, 10);
-    drawText("x" + floorf(P[PI_GEMS]).toString(), 254, 16, 22, WHITE);
+    drawItemSprite(4, floorf(220.0 * s), margin);
+    drawText("x" + floorf(P[PI_GEMS]).toString(), floorf(254.0 * s), floorf(16.0 * s), textSize, WHITE);
   }
 
   // Lives
-  drawText("Lives: " + floorf(P[PI_LIVES]).toString(), SCREEN_W - 120, 16, 20, WHITE);
+  const livesSize = floorf(20.0 * s);
+  drawText("Lives: " + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, WHITE);
+
+  // Debug bar
+  const dbgSize = floorf(16.0 * s);
+  const dbgY = sh - floorf(28.0 * s);
+  drawRect(0, dbgY - floorf(4.0 * s), sw, floorf(32.0 * s), { r: 0, g: 0, b: 0, a: 220 });
+  drawText("T:" + TILES.length.toString() + " L:" + floorf(LVL[0]).toString() + "x" + floorf(LVL[1]).toString() + " P:" + floorf(P[PI_X]).toString() + "," + floorf(P[PI_Y]).toString() + " Z:" + floorf(CAM[2] * 100.0).toString() + " S:" + floorf(sw).toString() + "x" + floorf(sh).toString() + " TID:" + floorf(texTileset.id).toString() + " TW:" + floorf(texTileset.width).toString(), floorf(8.0 * s), dbgY, dbgSize, { r: 255, g: 255, b: 0, a: 255 });
 }
 
 // ============================================================
 // MENU SCREENS
 // ============================================================
 
-function drawTitleScreen(t: number): void {
-  drawSkyGradient();
-  drawParallaxBg();
+function drawTitleScreen(t: number, sw: number, sh: number): void {
+  drawSkyGradient(sw, sh);
+  drawParallaxBg(sw, sh);
+  // Dark overlay for text readability
+  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 30, a: 120 });
+
+  const s = UI[UI_SCALE];
 
   // Title
+  const titleSize = floorf(60.0 * s);
   const titleText = "BLOOM JUMP";
-  const titleW = measureText(titleText, 60);
-  drawText(titleText, floorf((SCREEN_W - titleW) / 2), 120, 60, WHITE);
+  const titleW = measureText(titleText, titleSize);
+  drawText(titleText, floorf((sw - titleW) / 2.0), floorf(120.0 * s), titleSize, WHITE);
 
   // Subtitle
+  const subSize = floorf(20.0 * s);
   const subText = "A Bloom Engine Platformer";
-  const subW = measureText(subText, 20);
-  drawText(subText, floorf((SCREEN_W - subW) / 2), 190, 20, { r: 220, g: 220, b: 255, a: 255 });
+  const subW = measureText(subText, subSize);
+  drawText(subText, floorf((sw - subW) / 2.0), floorf(190.0 * s), subSize, { r: 220, g: 220, b: 255, a: 255 });
 
   // Menu options
+  const menuCount = MOBILE > 0.5 ? 1 : 2;
+  const menuSize = floorf(30.0 * s);
   const options = ["Play Game", "Level Editor (run ./editor)"];
   const selIdx = floorf(GS[GI_SEL]);
-  for (let i = 0; i < 2; i = i + 1) {
+  for (let i = 0; i < menuCount; i = i + 1) {
     const label = options[i];
-    const oy = 300 + i * 50;
-    const ow = measureText(label, 30);
-    const ox = floorf((SCREEN_W - ow) / 2);
+    const oy = floorf((300.0 + i * 50.0) * s);
+    const ow = measureText(label, menuSize);
+    const ox = floorf((sw - ow) / 2.0);
     if (i === selIdx) {
-      // Selected indicator
       const pulse = Math.sin(t * 4.0) * 0.3 + 0.7;
       const alpha = floorf(255.0 * pulse);
-      drawText("> " + label + " <", ox - 30, oy, 30, { r: 255, g: 255, b: 100, a: alpha });
+      drawText("> " + label + " <", floorf(ox - 30.0 * s), oy, menuSize, { r: 255, g: 255, b: 100, a: alpha });
     } else {
-      drawText(label, ox, oy, 30, { r: 200, g: 200, b: 220, a: 200 });
+      drawText(label, ox, oy, menuSize, { r: 200, g: 200, b: 220, a: 200 });
     }
   }
 
   // Instructions
-  drawText("Arrow Keys / WASD to move, SPACE to jump", floorf(SCREEN_W / 2) - 220, SCREEN_H - 60, 16, { r: 180, g: 180, b: 200, a: 180 });
+  const instrSize = floorf(16.0 * s);
+  if (MOBILE > 0.5) {
+    const iw = measureText("Tap Play to begin", instrSize);
+    drawText("Tap Play to begin", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  } else if (TV > 0.5) {
+    const iw = measureText("Press A to select", instrSize);
+    drawText("Press A to select", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  } else {
+    const iw = measureText("Arrow Keys / WASD to move, SPACE to jump", instrSize);
+    drawText("Arrow Keys / WASD to move, SPACE to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  }
 }
 
-function updateTitleScreen(): void {
-  if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S)) {
+function updateTitleScreen(sw: number, sh: number): void {
+  const menuMax = MOBILE > 0.5 ? 0.0 : 1.0;
+  // Keyboard / gamepad navigation
+  if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S) || GP[GP_DOWN] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
-    if (GS[GI_SEL] > 1.0) GS[GI_SEL] = 0.0;
+    if (GS[GI_SEL] > menuMax) GS[GI_SEL] = 0.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.UP) || isKeyPressed(Key.W)) {
+  if (isKeyPressed(Key.UP) || isKeyPressed(Key.W) || GP[GP_UP] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] - 1.0;
-    if (GS[GI_SEL] < 0.0) GS[GI_SEL] = 1.0;
+    if (GS[GI_SEL] < 0.0) GS[GI_SEL] = menuMax;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE)) {
+  if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE) || GP[GP_CONFIRM] > 0.5) {
     const sel = floorf(GS[GI_SEL]);
     if (sel === 0) {
       discoverLevels();
@@ -1292,103 +1507,241 @@ function updateTitleScreen(): void {
       GS[GI_SEL] = 0.0;
       playSound(sndSelect);
     }
-    // sel === 1: editor is a separate binary, no action
+  }
+  // Touch: tap on "Play Game" area
+  if (MOBILE > 0.5) {
+    const s = UI[UI_SCALE];
+    const menuY = floorf(300.0 * s);
+    const menuH = floorf(50.0 * s);
+    const tc = getTouchCount();
+    for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
+      const tx = getTouchX(ti);
+      const ty = getTouchY(ti);
+      if (ty > menuY - 10.0 && ty < menuY + menuH && tx > sw * 0.1 && tx < sw * 0.9) {
+        discoverLevels();
+        GS[GI_STATE] = ST_LEVEL_SELECT;
+        GS[GI_SEL] = 0.0;
+        playSound(sndSelect);
+      }
+    }
   }
 }
 
-function drawLevelSelect(t: number): void {
-  drawSkyGradient();
+function drawLevelSelect(t: number, sw: number, sh: number): void {
+  drawSkyGradient(sw, sh);
+  // Dark overlay for text readability
+  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 30, a: 120 });
 
-  drawText("SELECT LEVEL", floorf(SCREEN_W / 2) - 120, 40, 36, WHITE);
+  const s = UI[UI_SCALE];
+  const titleSize = floorf(36.0 * s);
+  const tw = measureText("SELECT LEVEL", titleSize);
+  drawText("SELECT LEVEL", floorf((sw - tw) / 2.0), floorf(40.0 * s), titleSize, WHITE);
 
   const count = floorf(GS[GI_LCOUNT]);
+  const itemSize = floorf(24.0 * s);
+  const rowH = floorf(40.0 * s);
   if (count < 1) {
-    drawText("No levels found in levels/ directory", 150, 250, 20, { r: 200, g: 200, b: 200, a: 200 });
-    drawText("Run the editor to create levels!", 170, 290, 20, { r: 200, g: 200, b: 200, a: 200 });
+    const emptySize = floorf(20.0 * s);
+    drawText("No levels found in levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
+    drawText("Run the editor to create levels!", floorf(170.0 * s), floorf(290.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
   }
 
   const selIdx = floorf(GS[GI_SEL]);
   for (let i = 0; i < count; i = i + 1) {
     if (i >= LEVEL_NAMES.length) break;
     const name = LEVEL_NAMES[i];
-    const oy = 100 + i * 40;
-    if (oy > SCREEN_H - 80) break;
+    const oy = floorf((100.0 + i * 40.0) * s);
+    if (oy > sh - floorf(80.0 * s)) break;
 
     if (i === selIdx) {
-      drawRect(80, oy - 4, SCREEN_W - 160, 36, { r: 255, g: 255, b: 255, a: 30 });
-      drawText("> " + name, 100, oy, 24, { r: 255, g: 255, b: 100, a: 255 });
+      drawRect(floorf(80.0 * s), oy - floorf(4.0 * s), sw - floorf(160.0 * s), floorf(36.0 * s), { r: 255, g: 255, b: 255, a: 30 });
+      drawText("> " + name, floorf(100.0 * s), oy, itemSize, { r: 255, g: 255, b: 100, a: 255 });
     } else {
-      drawText(name, 120, oy, 24, { r: 200, g: 200, b: 220, a: 200 });
+      drawText(name, floorf(120.0 * s), oy, itemSize, { r: 200, g: 200, b: 220, a: 200 });
     }
   }
 
-  drawText("ENTER to play, ESC to go back", floorf(SCREEN_W / 2) - 160, SCREEN_H - 40, 18, { r: 180, g: 180, b: 200, a: 180 });
+  const instrSize = floorf(18.0 * s);
+  if (MOBILE > 0.5) {
+    const iw = measureText("Tap a level to play", instrSize);
+    drawText("Tap a level to play", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  } else if (TV > 0.5) {
+    const iw = measureText("A to play, Menu to go back", instrSize);
+    drawText("A to play, Menu to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  } else {
+    const iw = measureText("ENTER to play, ESC to go back", instrSize);
+    drawText("ENTER to play, ESC to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  }
 }
 
-function updateLevelSelect(): void {
+function updateLevelSelect(sw: number, sh: number): void {
   const count = floorf(GS[GI_LCOUNT]);
-  if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S)) {
+  // Keyboard / gamepad navigation
+  if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S) || GP[GP_DOWN] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
     if (GS[GI_SEL] >= count) GS[GI_SEL] = 0.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.UP) || isKeyPressed(Key.W)) {
+  if (isKeyPressed(Key.UP) || isKeyPressed(Key.W) || GP[GP_UP] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] - 1.0;
     if (GS[GI_SEL] < 0.0) GS[GI_SEL] = count - 1.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE)) {
+  if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE) || GP[GP_CONFIRM] > 0.5) {
     if (count > 0) {
       startLevel(floorf(GS[GI_SEL]));
       GS[GI_STATE] = ST_PLAYING;
       playSound(sndSelect);
     }
   }
-  if (isKeyPressed(Key.ESCAPE)) {
+  if (isKeyPressed(Key.ESCAPE) || GP[GP_PAUSE] > 0.5) {
     GS[GI_STATE] = ST_MENU;
     GS[GI_SEL] = 0.0;
   }
+  // Touch: tap on level rows
+  if (MOBILE > 0.5) {
+    const s = UI[UI_SCALE];
+    const tc = getTouchCount();
+    for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
+      const tx = getTouchX(ti);
+      const ty = getTouchY(ti);
+      for (let li = 0.0; li < count; li = li + 1.0) {
+        const oy = (100.0 + li * 40.0) * s;
+        if (ty > oy - 4.0 * s && ty < oy + 36.0 * s && tx > 40.0 * s && tx < sw - 40.0 * s) {
+          startLevel(floorf(li));
+          GS[GI_STATE] = ST_PLAYING;
+          playSound(sndSelect);
+        }
+      }
+    }
+  }
 }
 
-function drawPauseScreen(): void {
-  drawRect(0, 0, SCREEN_W, SCREEN_H, { r: 0, g: 0, b: 0, a: 150 });
+function drawPauseScreen(sw: number, sh: number): void {
+  const s = UI[UI_SCALE];
+  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 0, a: 150 });
+  const pauseSize = floorf(48.0 * s);
   const text = "PAUSED";
-  const tw = measureText(text, 48);
-  drawText(text, floorf((SCREEN_W - tw) / 2), 220, 48, WHITE);
-  drawText("Press ESC to resume", floorf(SCREEN_W / 2) - 100, 290, 20, { r: 200, g: 200, b: 220, a: 200 });
-  drawText("Press Q to quit to menu", floorf(SCREEN_W / 2) - 120, 330, 20, { r: 200, g: 200, b: 220, a: 200 });
+  const tw = measureText(text, pauseSize);
+  drawText(text, floorf((sw - tw) / 2.0), floorf(220.0 * s), pauseSize, WHITE);
+
+  const btnSize = floorf(28.0 * s);
+  const resumeLabel = "Resume";
+  const resumeW = measureText(resumeLabel, btnSize);
+  drawText(resumeLabel, floorf((sw - resumeW) / 2.0), floorf(290.0 * s), btnSize, { r: 200, g: 200, b: 220, a: 200 });
+
+  const quitLabel = "Quit to Menu";
+  const quitW = measureText(quitLabel, btnSize);
+  drawText(quitLabel, floorf((sw - quitW) / 2.0), floorf(340.0 * s), btnSize, { r: 200, g: 200, b: 220, a: 200 });
+
+  const instrSize = floorf(16.0 * s);
+  if (MOBILE > 0.5) {
+    const iw = measureText("Tap to Resume or Quit", instrSize);
+    drawText("Tap to Resume or Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  } else if (TV > 0.5) {
+    const iw = measureText("A to Resume, Menu to Quit", instrSize);
+    drawText("A to Resume, Menu to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  } else {
+    const iw = measureText("ESC to Resume, Q to Quit", instrSize);
+    drawText("ESC to Resume, Q to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+  }
 }
 
-function drawGameOver(): void {
-  drawSkyGradient();
+function drawGameOver(sw: number, sh: number): void {
+  const s = UI[UI_SCALE];
+  drawSkyGradient(sw, sh);
+  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 30, a: 120 });
+  const headSize = floorf(48.0 * s);
   const text = "GAME OVER";
-  const tw = measureText(text, 48);
-  drawText(text, floorf((SCREEN_W - tw) / 2), 200, 48, { r: 230, g: 60, b: 60, a: 255 });
+  const tw = measureText(text, headSize);
+  drawText(text, floorf((sw - tw) / 2.0), floorf(200.0 * s), headSize, { r: 230, g: 60, b: 60, a: 255 });
 
+  const bodySize = floorf(24.0 * s);
   const coinsText = "Coins: " + floorf(P[PI_COINS]).toString();
-  const cw = measureText(coinsText, 24);
-  drawText(coinsText, floorf((SCREEN_W - cw) / 2), 280, 24, WHITE);
+  const cw = measureText(coinsText, bodySize);
+  drawText(coinsText, floorf((sw - cw) / 2.0), floorf(280.0 * s), bodySize, WHITE);
 
-  drawText("Press ENTER to continue", floorf(SCREEN_W / 2) - 120, 360, 20, { r: 200, g: 200, b: 220, a: 200 });
+  const instrSize = floorf(20.0 * s);
+  if (MOBILE > 0.5) {
+    const iw = measureText("Tap to continue", instrSize);
+    drawText("Tap to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+  } else if (TV > 0.5) {
+    const iw = measureText("Press A to continue", instrSize);
+    drawText("Press A to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+  } else {
+    const iw = measureText("Press ENTER to continue", instrSize);
+    drawText("Press ENTER to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+  }
 }
 
-function drawLevelCompleteScreen(t: number): void {
-  drawRect(0, 0, SCREEN_W, SCREEN_H, { r: 0, g: 0, b: 0, a: 150 });
+function drawLevelCompleteScreen(t: number, sw: number, sh: number): void {
+  const s = UI[UI_SCALE];
+  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 0, a: 150 });
+  const headSize = floorf(42.0 * s);
   const text = "LEVEL COMPLETE!";
-  const tw = measureText(text, 42);
-  drawText(text, floorf((SCREEN_W - tw) / 2), 180, 42, { r: 255, g: 255, b: 100, a: 255 });
+  const tw = measureText(text, headSize);
+  drawText(text, floorf((sw - tw) / 2.0), floorf(180.0 * s), headSize, { r: 255, g: 255, b: 100, a: 255 });
 
+  const bodySize = floorf(24.0 * s);
   const coinsText = "Coins: " + floorf(P[PI_COINS]).toString();
-  const cw = measureText(coinsText, 24);
-  drawText(coinsText, floorf((SCREEN_W - cw) / 2), 260, 24, WHITE);
+  const cw = measureText(coinsText, bodySize);
+  drawText(coinsText, floorf((sw - cw) / 2.0), floorf(260.0 * s), bodySize, WHITE);
 
   if (P[PI_GEMS] > 0.0) {
     const gemText = "Gems: " + floorf(P[PI_GEMS]).toString();
-    const gw = measureText(gemText, 24);
-    drawText(gemText, floorf((SCREEN_W - gw) / 2), 300, 24, { r: 50, g: 150, b: 255, a: 255 });
+    const gw = measureText(gemText, bodySize);
+    drawText(gemText, floorf((sw - gw) / 2.0), floorf(300.0 * s), bodySize, { r: 50, g: 150, b: 255, a: 255 });
   }
 
-  drawText("Press ENTER to continue", floorf(SCREEN_W / 2) - 120, 380, 20, { r: 200, g: 200, b: 220, a: 200 });
+  const instrSize = floorf(20.0 * s);
+  if (MOBILE > 0.5) {
+    const iw = measureText("Tap to continue", instrSize);
+    drawText("Tap to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+  } else if (TV > 0.5) {
+    const iw = measureText("Press A to continue", instrSize);
+    drawText("Press A to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+  } else {
+    drawText("Press ENTER to continue", floorf(sw / 2.0) - 120, 380, 20, { r: 200, g: 200, b: 220, a: 200 });
+  }
+}
+
+// ============================================================
+// TOUCH CONTROLS OVERLAY
+// ============================================================
+
+function drawTouchControls(sw: number, sh: number): void {
+  if (MOBILE < 0.5) return;
+
+  const s = UI[UI_SCALE];
+
+  // Virtual joystick (bottom-left)
+  const joyR = floorf(TOUCH_JOY_RADIUS * s);
+  const joyX = floorf(TOUCH_JOY_X_POS * s);
+  const joyY = floorf(sh - TOUCH_JOY_Y_OFFSET * s);
+  drawCircle(joyX, joyY, joyR, { r: 255, g: 255, b: 255, a: 30 });
+  const knobX = joyX + floorf(TCH[TI_JOY_X] * joyR * 0.8);
+  const knobY = joyY + floorf(TCH[TI_JOY_Y] * joyR * 0.8);
+  drawCircle(floorf(knobX), floorf(knobY), floorf(20.0 * s), { r: 255, g: 255, b: 255, a: 60 });
+
+  // Jump button (bottom-right)
+  const jumpR = floorf(TOUCH_JUMP_RADIUS * s);
+  const jumpX = floorf(sw - TOUCH_JUMP_X_OFFSET * s);
+  const jumpY = floorf(sh - TOUCH_JUMP_Y_OFFSET * s);
+  let jumpAlpha = 40;
+  if (TCH[TI_JUMP_DOWN] > 0.5) jumpAlpha = 80;
+  drawCircle(jumpX, jumpY, jumpR, { r: 255, g: 255, b: 255, a: jumpAlpha });
+  const jumpLabelSize = floorf(16.0 * s);
+  drawText("Jump", jumpX - floorf(20.0 * s), jumpY - floorf(8.0 * s), jumpLabelSize, { r: 255, g: 255, b: 255, a: 150 });
+
+  // Pause button (top-right)
+  const pauseS = floorf(TOUCH_PAUSE_SIZE * s * 0.75);
+  const pauseX = floorf(sw - TOUCH_PAUSE_X_OFFSET * s);
+  const pauseY = floorf(TOUCH_PAUSE_Y_OFFSET * s);
+  drawRect(pauseX - pauseS, pauseY - pauseS, pauseS * 2, pauseS * 2, { r: 255, g: 255, b: 255, a: 30 });
+  const barW = floorf(4.0 * s);
+  const barH = floorf(16.0 * s);
+  drawRect(pauseX - floorf(6.0 * s), pauseY - floorf(8.0 * s), barW, barH, { r: 255, g: 255, b: 255, a: 120 });
+  drawRect(pauseX + floorf(2.0 * s), pauseY - floorf(8.0 * s), barW, barH, { r: 255, g: 255, b: 255, a: 120 });
 }
 
 // ============================================================
@@ -1396,7 +1749,7 @@ function drawLevelCompleteScreen(t: number): void {
 // ============================================================
 
 const camera: Camera2D = {
-  offset: { x: SCREEN_W / 2, y: SCREEN_H / 2 },
+  offset: { x: 400.0, y: 300.0 },
   target: { x: 0.0, y: 0.0 },
   rotation: 0.0,
   zoom: 1.0,
@@ -1409,19 +1762,34 @@ while (!windowShouldClose()) {
   const dt = getDeltaTime();
   const t = getTime();
 
+  // Dynamic screen size (mobile fills device screen, desktop uses SCREEN_W/SCREEN_H)
+  const sw = getScreenWidth();
+  const sh = getScreenHeight();
+  camera.offset.x = sw / 2.0;
+  camera.offset.y = sh / 2.0;
+
+  // UI scale: scale all text/positions relative to design height
+  // In landscape sh is shorter dim, in portrait sw is shorter
+  const shortDim = sw < sh ? sw : sh;
+  UI[UI_SCALE] = shortDim / DESIGN_H;
+
+  // Process platform input
+  updateTouchInput(sw, sh);
+  updateGamepadInput();
+
   beginDrawing();
 
   const state = floorf(GS[GI_STATE]);
 
   if (state === ST_MENU) {
     // === TITLE SCREEN ===
-    updateTitleScreen();
-    drawTitleScreen(t);
+    updateTitleScreen(sw, sh);
+    drawTitleScreen(t, sw, sh);
 
   } else if (state === ST_LEVEL_SELECT) {
     // === LEVEL SELECT ===
-    updateLevelSelect();
-    drawLevelSelect(t);
+    updateLevelSelect(sw, sh);
+    drawLevelSelect(t, sw, sh);
 
   } else if (state === ST_PLAYING) {
     // === GAMEPLAY ===
@@ -1429,7 +1797,7 @@ while (!windowShouldClose()) {
     updateEnemies(dt);
     updateCollectibles(dt, t);
     updateParticles(dt);
-    updateCamera(dt);
+    updateCamera(dt, sw, sh);
 
     // Update camera struct
     camera.target.x = floorf(CAM[0]);
@@ -1437,26 +1805,22 @@ while (!windowShouldClose()) {
     camera.zoom = CAM[2];
 
     // Draw
-    drawSkyGradient();
-    drawParallaxBg();
+    drawSkyGradient(sw, sh);
+    drawParallaxBg(sw, sh);
 
     beginMode2D(camera);
-    drawVisibleTiles();
+    drawVisibleTiles(sw, sh);
     drawCollectibles(t);
     drawEnemies(t);
     drawPlayerCharacter(t);
     drawParticles();
     endMode2D();
 
-    drawHUD();
-
-    // Level complete overlay
-    if (GS[GI_FLAG] > 0.5 && GS[GI_CTIMER] <= 0.0) {
-      // Handled by state change
-    }
+    drawHUD(sw, sh);
+    drawTouchControls(sw, sh);
 
     // Pause
-    if (isKeyPressed(Key.ESCAPE)) {
+    if (isKeyPressed(Key.ESCAPE) || TCH[TI_PAUSE_PRESSED] > 0.5 || GP[GP_PAUSE] > 0.5) {
       GS[GI_STATE] = ST_PAUSED;
     }
 
@@ -1465,29 +1829,45 @@ while (!windowShouldClose()) {
     // Draw game underneath
     camera.target.x = floorf(CAM[0]);
     camera.target.y = floorf(CAM[1]);
-    drawSkyGradient();
-    drawParallaxBg();
+    camera.zoom = CAM[2];
+    drawSkyGradient(sw, sh);
+    drawParallaxBg(sw, sh);
     beginMode2D(camera);
-    drawVisibleTiles();
+    drawVisibleTiles(sw, sh);
     drawCollectibles(t);
     drawEnemies(t);
     drawPlayerCharacter(t);
     endMode2D();
-    drawHUD();
-    drawPauseScreen();
+    drawHUD(sw, sh);
+    drawPauseScreen(sw, sh);
 
-    if (isKeyPressed(Key.ESCAPE)) {
+    if (isKeyPressed(Key.ESCAPE) || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_PLAYING;
     }
-    if (isKeyPressed(Key.Q)) {
+    if (isKeyPressed(Key.Q) || GP[GP_PAUSE] > 0.5) {
       GS[GI_STATE] = ST_MENU;
       GS[GI_SEL] = 0.0;
+    }
+    // Touch: tap Resume or Quit areas
+    if (MOBILE > 0.5) {
+      const ps = UI[UI_SCALE];
+      const tc = getTouchCount();
+      for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
+        const ty = getTouchY(ti);
+        const tx = getTouchX(ti);
+        if (tx > sw * 0.2 && tx < sw * 0.8) {
+          if (ty > 280.0 * ps && ty < 320.0 * ps) GS[GI_STATE] = ST_PLAYING;
+          if (ty > 330.0 * ps && ty < 370.0 * ps) { GS[GI_STATE] = ST_MENU; GS[GI_SEL] = 0.0; }
+        }
+      }
     }
 
   } else if (state === ST_GAME_OVER) {
     // === GAME OVER ===
-    drawGameOver();
-    if (isKeyPressed(Key.ENTER)) {
+    drawGameOver(sw, sh);
+    let goAnyTap = 0.0;
+    if (MOBILE > 0.5 && getTouchCount() > 0.0) goAnyTap = 1.0;
+    if (isKeyPressed(Key.ENTER) || goAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL];
       P[PI_LIVES] = 3.0;
@@ -1498,17 +1878,20 @@ while (!windowShouldClose()) {
     // Draw game underneath
     camera.target.x = floorf(CAM[0]);
     camera.target.y = floorf(CAM[1]);
-    drawSkyGradient();
-    drawParallaxBg();
+    camera.zoom = CAM[2];
+    drawSkyGradient(sw, sh);
+    drawParallaxBg(sw, sh);
     beginMode2D(camera);
-    drawVisibleTiles();
+    drawVisibleTiles(sw, sh);
     drawCollectibles(t);
     drawPlayerCharacter(t);
     endMode2D();
-    drawHUD();
-    drawLevelCompleteScreen(t);
+    drawHUD(sw, sh);
+    drawLevelCompleteScreen(t, sw, sh);
 
-    if (isKeyPressed(Key.ENTER)) {
+    let lcAnyTap = 0.0;
+    if (MOBILE > 0.5 && getTouchCount() > 0.0) lcAnyTap = 1.0;
+    if (isKeyPressed(Key.ENTER) || lcAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL] + 1.0;
       if (GS[GI_SEL] >= GS[GI_LCOUNT]) GS[GI_SEL] = 0.0;

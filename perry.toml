@@ -2,8 +2,24 @@
 opt_level = 2
 out_dir = "dist"
 
-[project]
-entry = "src/main.ts"
-name = "bloom-jump"
+[ios]
 bundle_id = "com.bloomengine.jump"
+certificate = "/Users/amlug/.perry/distribution.p12"
+distribute = "testflight"
+encryption_exempt = true
+provisioning_profile = "/Users/amlug/.perry/com_bloomengine_jump.mobileprovision"
+signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
+
+[tvos]
+bundle_id = "com.bloomengine.jump"
+
+[project]
+build_number = 2
+bundle_id = "com.bloomengine.jump"
+entry = "src/main.ts"
 features = ["ios-game-loop"]
+name = "bloom-jump"
+version = "1.0.0"
+
+[project.icons]
+source = "assets/icon.png"
