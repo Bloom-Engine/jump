@@ -24,7 +24,6 @@ import { drawText, measureText } from "bloom/text";
 import {
   loadTexture, drawTexturePro, drawTextureRec,
   setTextureFilter, FILTER_NEAREST,
-  stageTextures, commitTexture,
 } from "bloom/textures";
 import {
   initAudioDevice, closeAudioDevice,
@@ -32,6 +31,22 @@ import {
 } from "bloom/audio";
 import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
 import { Rect, Texture, Sound } from "bloom/core";
+
+// Direct FFI declaration — bypasses TypeScript wrapper object creation/property access overhead.
+// Each drawTexturePro via the wrapper creates 4 objects + 16 property lookups.
+// Direct call: zero objects, zero lookups, single FFI call.
+declare function bloom_draw_texture_pro(
+  handle: number, sx: number, sy: number, sw: number, sh: number,
+  dx: number, dy: number, dw: number, dh: number,
+  ox: number, oy: number, rot: number,
+  r: number, g: number, b: number, a: number
+): void;
+declare function bloom_draw_rect(x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_draw_rect_lines(x: number, y: number, w: number, h: number, thickness: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_draw_circle(cx: number, cy: number, radius: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_draw_line(x1: number, y1: number, x2: number, y2: number, thickness: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_draw_triangle(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_draw_text(text: number, x: number, y: number, size: number, r: number, g: number, b: number, a: number): void;
 
 // ============================================================
 // PLATFORM DETECTION
@@ -89,6 +104,18 @@ const GP_DEADZONE = 0.15;
 const SCREEN_W = 800;
 const SCREEN_H = 600;
 const DESIGN_H = 600.0; // UI reference height for scaling
+
+// Atlas sub-sheet offsets (where each sprite sheet lives in the 256x256 atlas)
+const ATLAS_TILE_X = 0.0;
+const ATLAS_TILE_Y = 0.0;
+const ATLAS_ENEMY_X = 128.0;
+const ATLAS_ENEMY_Y = 0.0;
+const ATLAS_PLAYER_X = 0.0;
+const ATLAS_PLAYER_Y = 64.0;
+const ATLAS_ITEM_X = 0.0;
+const ATLAS_ITEM_Y = 80.0;
+const ATLAS_UI_X = 0.0;
+const ATLAS_UI_Y = 96.0;
 
 // UI scale state [uiScale] — updated each frame from screen size
 const UI = [1.0];
@@ -235,24 +262,12 @@ clearBackground(LOADING_BG);
 drawText("Loading...", getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, LOADING_TEXT);
 endDrawing();
 
-// Stage all textures on background threads (parallel decode), then commit to GPU
-const staged = stageTextures([
-  "assets/sprites/tileset.png",
-  "assets/sprites/player.png",
-  "assets/sprites/enemies.png",
-  "assets/sprites/items.png",
-  "assets/sprites/ui.png",
-]);
-const texTileset = commitTexture(staged[0]);
-setTextureFilter(texTileset, FILTER_NEAREST);
-const texPlayer = commitTexture(staged[1]);
-setTextureFilter(texPlayer, FILTER_NEAREST);
-const texEnemies = commitTexture(staged[2]);
-setTextureFilter(texEnemies, FILTER_NEAREST);
-const texItems = commitTexture(staged[3]);
-setTextureFilter(texItems, FILTER_NEAREST);
-const texUI = commitTexture(staged[4]);
-setTextureFilter(texUI, FILTER_NEAREST);
+// Load single atlas texture (all sprites in one sheet = zero texture switches)
+const texAtlas = loadTexture("assets/sprites/atlas.png");
+setTextureFilter(texAtlas, FILTER_NEAREST);
+// Cache texture ID to avoid repeated string-based property lookup on texAtlas.id
+const ATLAS_ID = texAtlas.id;
+const UI_TEX_ID = ATLAS_ID; // same atlas
 
 // Load sounds
 const sndJump = loadSound("assets/sounds/jump.wav");
@@ -421,47 +436,37 @@ function updateGamepadInput(): void {
 // SPRITE DRAWING
 // ============================================================
 
+// Direct FFI sprite drawing — avoids object allocation + property lookup overhead
 function drawSpriteFromSheet(tex: Texture, frameX: number, frameY: number, srcW: number, srcH: number, dstX: number, dstY: number, dstW: number, dstH: number, tint: Color): void {
-  drawTexturePro(
-    tex,
-    { x: frameX, y: frameY, width: srcW, height: srcH },
-    { x: dstX, y: dstY, width: dstW, height: dstH },
-    { x: 0.0, y: 0.0 }, 0.0, tint,
-  );
+  bloom_draw_texture_pro(tex.id, frameX, frameY, srcW, srcH, dstX, dstY, dstW, dstH, 0.0, 0.0, 0.0, tint.r, tint.g, tint.b, tint.a);
 }
 
 function drawTileAt(tileType: number, sx: number, sy: number): void {
   if (tileType <= T_AIR) return;
   const col = (tileType - 1) % 8;
   const row = floorf((tileType - 1) / 8);
-  drawSpriteFromSheet(texTileset, col * TILE_SRC, row * TILE_SRC, TILE_SRC, TILE_SRC, sx, sy, TILE_SIZE, TILE_SIZE, WHITE);
+  bloom_draw_texture_pro(ATLAS_ID, ATLAS_TILE_X + col * TILE_SRC, ATLAS_TILE_Y + row * TILE_SRC, TILE_SRC, TILE_SRC, sx, sy, TILE_SIZE, TILE_SIZE, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
 }
 
 function drawPlayerSprite(x: number, y: number, frame: number, facingRight: number): void {
+  const baseX = ATLAS_PLAYER_X + frame * TILE_SRC;
+  const srcX = facingRight > 0.5 ? baseX : baseX + TILE_SRC;
   const srcW = facingRight > 0.5 ? TILE_SRC : 0.0 - TILE_SRC;
-  drawTexturePro(
-    texPlayer,
-    { x: frame * TILE_SRC, y: 0.0, width: srcW, height: TILE_SRC },
-    { x: x, y: y, width: TILE_SIZE, height: TILE_SIZE },
-    { x: 0.0, y: 0.0 }, 0.0, WHITE,
-  );
+  bloom_draw_texture_pro(ATLAS_ID, srcX, ATLAS_PLAYER_Y, srcW, TILE_SRC, x, y, TILE_SIZE, TILE_SIZE, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
 }
 
 function drawEnemySprite(type: number, frame: number, x: number, y: number, facingRight: number): void {
   let row = 0;
   if (type === E_FLYER) row = 1;
   if (type === E_CHASER) row = 2;
+  const baseX = ATLAS_ENEMY_X + frame * TILE_SRC;
+  const srcX = facingRight > 0.5 ? baseX : baseX + TILE_SRC;
   const srcW = facingRight > 0.5 ? TILE_SRC : 0.0 - TILE_SRC;
-  drawTexturePro(
-    texEnemies,
-    { x: frame * TILE_SRC, y: row * TILE_SRC, width: srcW, height: TILE_SRC },
-    { x: x, y: y, width: TILE_SIZE, height: TILE_SIZE },
-    { x: 0.0, y: 0.0 }, 0.0, WHITE,
-  );
+  bloom_draw_texture_pro(ATLAS_ID, srcX, ATLAS_ENEMY_Y + row * TILE_SRC, srcW, TILE_SRC, x, y, TILE_SIZE, TILE_SIZE, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
 }
 
 function drawItemSprite(frame: number, x: number, y: number): void {
-  drawSpriteFromSheet(texItems, frame * TILE_SRC, 0, TILE_SRC, TILE_SRC, x, y, TILE_SIZE, TILE_SIZE, WHITE);
+  bloom_draw_texture_pro(ATLAS_ID, ATLAS_ITEM_X + frame * TILE_SRC, ATLAS_ITEM_Y, TILE_SRC, TILE_SRC, x, y, TILE_SIZE, TILE_SIZE, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
 }
 
 // ============================================================
@@ -528,7 +533,7 @@ function drawParticles(): void {
     else if (PRC[i] < 1.5) { r = 255; g = 210; b = 50; }   // gold (coin)
     else if (PRC[i] < 2.5) { r = 160; g = 160; b = 160; }  // gray (dust)
     else { r = 200; g = 60; b = 50; }                       // red (enemy)
-    drawRect(floorf(PRX[i] - s * 0.5), floorf(PRY[i] - s * 0.5), floorf(s), floorf(s), { r: r, g: g, b: b, a: floorf(a) });
+    bloom_draw_rect(floorf(PRX[i] - s * 0.5), floorf(PRY[i] - s * 0.5), floorf(s), floorf(s), r, g, b, floorf(a));
   }
 }
 
@@ -1245,15 +1250,15 @@ function drawCollectibles(t: number): void {
       const fx = floorf(CX[i]);
       const fy = floorf(CY[i]);
       // Large bright green background glow
-      drawRect(fx - 8, fy - 128, 48, 160, FLAG_GLOW);
+      bloom_draw_rect(fx - 8, fy - 128, 48, 160, 50, 255, 50, 60);
       // Tall pole
-      drawRect(fx + 14, fy - 120, 5, 152, FLAG_POLE);
+      bloom_draw_rect(fx + 14, fy - 120, 5, 152, 160, 160, 170, 255);
       // Big red banner
-      drawRect(fx + 19, fy - 116, 32, 24, FLAG_BANNER);
+      bloom_draw_rect(fx + 19, fy - 116, 32, 24, 230, 40, 40, 255);
       const wave = Math.sin(t * 4.0) * 4.0;
-      drawTriangle(fx + 51, fy - 116, fx + 51, fy - 92, fx + 60 + floorf(wave), fy - 104, FLAG_BANNER2);
+      bloom_draw_triangle(fx + 51, fy - 116, fx + 51, fy - 92, fx + 60 + floorf(wave), fy - 104, 210, 30, 30, 255);
       // Gold ball on top
-      drawCircle(fx + 16, fy - 124, 6, FLAG_BALL);
+      bloom_draw_circle(fx + 16, fy - 124, 6, 255, 220, 50, 255);
       // "GOAL" text above
       drawText("GOAL", fx - 2, fy - 148, 18, FLAG_TEXT);
     }
@@ -1297,10 +1302,10 @@ function drawSkyGradient(sw: number, sh: number): void {
   const stripH = sh / steps;
   for (let i = 0; i < steps; i = i + 1) {
     const t = i / (steps - 1.0);
-    SKY_STRIP.r = floorf(SKY_TOP.r + (SKY_BOT.r - SKY_TOP.r) * t);
-    SKY_STRIP.g = floorf(SKY_TOP.g + (SKY_BOT.g - SKY_TOP.g) * t);
-    SKY_STRIP.b = floorf(SKY_TOP.b + (SKY_BOT.b - SKY_TOP.b) * t);
-    drawRect(0, floorf(i * stripH), sw, floorf(stripH) + 1, SKY_STRIP);
+    const sr = floorf(100.0 + 80.0 * t);
+    const sg = floorf(180.0 + 40.0 * t);
+    const sb = floorf(255.0 + 0.0 * t);
+    bloom_draw_rect(0, floorf(i * stripH), sw, floorf(stripH) + 1, sr, sg, sb, 255);
   }
 }
 
@@ -1317,7 +1322,7 @@ function drawParallaxBg(sw: number, sh: number): void {
   while (mi < mCount) {
     const px = floorf(mi * 180.0 - (mx % 180.0) - 180.0);
     const h = 80.0 + (mi % 3.0) * 40.0 + (mi % 2.0) * 25.0;
-    drawTriangle(px, mBase, px + 90, floorf(mBase - h), px + 180, mBase, MOUNT_COLOR);
+    bloom_draw_triangle(px, mBase, px + 90, floorf(mBase - h), px + 180, mBase, 140, 160, 200, 100);
     mi = mi + 1.0;
   }
 
@@ -1330,7 +1335,7 @@ function drawParallaxBg(sw: number, sh: number): void {
     const h = 50.0 + (hi % 3.0) * 20.0;
     const w = 200.0;
     // Approximate hill with overlapping triangles
-    drawTriangle(px, hBase, floorf(px + w * 0.5), floorf(hBase - h), px + floorf(w), hBase, HILL_COLOR);
+    bloom_draw_triangle(px, hBase, floorf(px + w * 0.5), floorf(hBase - h), px + floorf(w), hBase, 80, 150, 80, 80);
     hi = hi + 1.0;
   }
 }
@@ -1380,13 +1385,10 @@ function drawPlayerCharacter(t: number): void {
     drawY = P[PI_Y] - floorf(st * 3.0);
   }
 
+  const pBaseX = ATLAS_PLAYER_X + frame * TILE_SRC;
+  const pSrcX = P[PI_FACE] > 0.5 ? pBaseX : pBaseX + TILE_SRC;
   const srcW = P[PI_FACE] > 0.5 ? TILE_SRC : 0.0 - TILE_SRC;
-  drawTexturePro(
-    texPlayer,
-    { x: frame * TILE_SRC, y: 0.0, width: srcW, height: TILE_SRC },
-    { x: floorf(P[PI_X]), y: floorf(drawY), width: TILE_SIZE, height: floorf(drawH) },
-    { x: 0.0, y: 0.0 }, 0.0, WHITE,
-  );
+  bloom_draw_texture_pro(ATLAS_ID, pSrcX, ATLAS_PLAYER_Y, srcW, TILE_SRC, floorf(P[PI_X]), floorf(drawY), TILE_SIZE, floorf(drawH), 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
 }
 
 function drawHUD(sw: number, sh: number): void {
@@ -1400,16 +1402,16 @@ function drawHUD(sw: number, sh: number): void {
     const hx = margin + floorf(i * 36.0 * s);
     const hy = margin;
     if (i < P[PI_HP]) {
-      drawSpriteFromSheet(texUI, 0, 0, 16, 16, hx, hy, iconSize, iconSize, WHITE);
+      bloom_draw_texture_pro(UI_TEX_ID, ATLAS_UI_X, ATLAS_UI_Y, 16, 16, hx, hy, iconSize, iconSize, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
     } else {
-      drawSpriteFromSheet(texUI, 16, 0, 16, 16, hx, hy, iconSize, iconSize, WHITE);
+      bloom_draw_texture_pro(UI_TEX_ID, ATLAS_UI_X + 16.0, ATLAS_UI_Y, 16, 16, hx, hy, iconSize, iconSize, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
     }
   }
 
   // Coin count
   const coinX = floorf(130.0 * s);
   const coinIconSize = floorf(24.0 * s);
-  drawSpriteFromSheet(texUI, 32, 0, 16, 16, coinX, floorf(14.0 * s), coinIconSize, coinIconSize, WHITE);
+  bloom_draw_texture_pro(UI_TEX_ID, ATLAS_UI_X + 32.0, ATLAS_UI_Y, 16, 16, coinX, floorf(14.0 * s), coinIconSize, coinIconSize, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
   drawText("x" + floorf(P[PI_COINS]).toString(), floorf(158.0 * s), floorf(16.0 * s), textSize, WHITE);
 
   // Gem count
@@ -1422,11 +1424,11 @@ function drawHUD(sw: number, sh: number): void {
   const livesSize = floorf(20.0 * s);
   drawText("Lives: " + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, WHITE);
 
-  // Debug bar
-  const dbgSize = floorf(16.0 * s);
-  const dbgY = sh - floorf(28.0 * s);
-  drawRect(0, dbgY - floorf(4.0 * s), sw, floorf(32.0 * s), { r: 0, g: 0, b: 0, a: 220 });
-  drawText("T:" + TILES.length.toString() + " L:" + floorf(LVL[0]).toString() + "x" + floorf(LVL[1]).toString() + " P:" + floorf(P[PI_X]).toString() + "," + floorf(P[PI_Y]).toString() + " Z:" + floorf(CAM[2] * 100.0).toString() + " S:" + floorf(sw).toString() + "x" + floorf(sh).toString() + " TID:" + floorf(texTileset.id).toString() + " TW:" + floorf(texTileset.width).toString(), floorf(8.0 * s), dbgY, dbgSize, { r: 255, g: 255, b: 0, a: 255 });
+  // Perf debug bar
+  const dbgSize = floorf(14.0 * s);
+  const dbgY = sh - floorf(24.0 * s);
+  bloom_draw_rect(0, dbgY - floorf(4.0 * s), sw, floorf(28.0 * s), 0, 0, 0, 220);
+  drawText("FPS:" + floorf(PERF[PF_FPS]).toString() + " dt:" + floorf(PERF[PF_LASTDT] * 1000.0).toString() + "ms drw:" + floorf(PERF[PF_DRAW] * 10.0).toString() + " sky:" + floorf(PERF[6]).toString() + " til:" + floorf(PERF[7]).toString() + " wld:" + floorf(PERF[8]).toString() + " hud:" + floorf(PERF[9]).toString(), floorf(8.0 * s), dbgY, dbgSize, { r: 255, g: 255, b: 0, a: 255 });
 }
 
 // ============================================================
@@ -1437,7 +1439,7 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
   drawSkyGradient(sw, sh);
   drawParallaxBg(sw, sh);
   // Dark overlay for text readability
-  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 30, a: 120 });
+  bloom_draw_rect(0, 0, sw, sh, 0, 0, 30, 120);
 
   const s = UI[UI_SCALE];
 
@@ -1530,7 +1532,7 @@ function updateTitleScreen(sw: number, sh: number): void {
 function drawLevelSelect(t: number, sw: number, sh: number): void {
   drawSkyGradient(sw, sh);
   // Dark overlay for text readability
-  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 30, a: 120 });
+  bloom_draw_rect(0, 0, sw, sh, 0, 0, 30, 120);
 
   const s = UI[UI_SCALE];
   const titleSize = floorf(36.0 * s);
@@ -1554,7 +1556,7 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
     if (oy > sh - floorf(80.0 * s)) break;
 
     if (i === selIdx) {
-      drawRect(floorf(80.0 * s), oy - floorf(4.0 * s), sw - floorf(160.0 * s), floorf(36.0 * s), { r: 255, g: 255, b: 255, a: 30 });
+      bloom_draw_rect(floorf(80.0 * s), oy - floorf(4.0 * s), sw - floorf(160.0 * s), floorf(36.0 * s), 255, 255, 255, 30);
       drawText("> " + name, floorf(100.0 * s), oy, itemSize, { r: 255, g: 255, b: 100, a: 255 });
     } else {
       drawText(name, floorf(120.0 * s), oy, itemSize, { r: 200, g: 200, b: 220, a: 200 });
@@ -1619,7 +1621,7 @@ function updateLevelSelect(sw: number, sh: number): void {
 
 function drawPauseScreen(sw: number, sh: number): void {
   const s = UI[UI_SCALE];
-  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 0, a: 150 });
+  bloom_draw_rect(0, 0, sw, sh, 0, 0, 0, 150);
   const pauseSize = floorf(48.0 * s);
   const text = "PAUSED";
   const tw = measureText(text, pauseSize);
@@ -1650,7 +1652,7 @@ function drawPauseScreen(sw: number, sh: number): void {
 function drawGameOver(sw: number, sh: number): void {
   const s = UI[UI_SCALE];
   drawSkyGradient(sw, sh);
-  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 30, a: 120 });
+  bloom_draw_rect(0, 0, sw, sh, 0, 0, 30, 120);
   const headSize = floorf(48.0 * s);
   const text = "GAME OVER";
   const tw = measureText(text, headSize);
@@ -1676,7 +1678,7 @@ function drawGameOver(sw: number, sh: number): void {
 
 function drawLevelCompleteScreen(t: number, sw: number, sh: number): void {
   const s = UI[UI_SCALE];
-  drawRect(0, 0, sw, sh, { r: 0, g: 0, b: 0, a: 150 });
+  bloom_draw_rect(0, 0, sw, sh, 0, 0, 0, 150);
   const headSize = floorf(42.0 * s);
   const text = "LEVEL COMPLETE!";
   const tw = measureText(text, headSize);
@@ -1718,10 +1720,10 @@ function drawTouchControls(sw: number, sh: number): void {
   const joyR = floorf(TOUCH_JOY_RADIUS * s);
   const joyX = floorf(TOUCH_JOY_X_POS * s);
   const joyY = floorf(sh - TOUCH_JOY_Y_OFFSET * s);
-  drawCircle(joyX, joyY, joyR, { r: 255, g: 255, b: 255, a: 30 });
+  bloom_draw_circle(joyX, joyY, joyR, 255, 255, 255, 30);
   const knobX = joyX + floorf(TCH[TI_JOY_X] * joyR * 0.8);
   const knobY = joyY + floorf(TCH[TI_JOY_Y] * joyR * 0.8);
-  drawCircle(floorf(knobX), floorf(knobY), floorf(20.0 * s), { r: 255, g: 255, b: 255, a: 60 });
+  bloom_draw_circle(floorf(knobX), floorf(knobY), floorf(20.0 * s), 255, 255, 255, 60);
 
   // Jump button (bottom-right)
   const jumpR = floorf(TOUCH_JUMP_RADIUS * s);
@@ -1729,7 +1731,7 @@ function drawTouchControls(sw: number, sh: number): void {
   const jumpY = floorf(sh - TOUCH_JUMP_Y_OFFSET * s);
   let jumpAlpha = 40;
   if (TCH[TI_JUMP_DOWN] > 0.5) jumpAlpha = 80;
-  drawCircle(jumpX, jumpY, jumpR, { r: 255, g: 255, b: 255, a: jumpAlpha });
+  bloom_draw_circle(jumpX, jumpY, jumpR, 255, 255, 255, jumpAlpha);
   const jumpLabelSize = floorf(16.0 * s);
   drawText("Jump", jumpX - floorf(20.0 * s), jumpY - floorf(8.0 * s), jumpLabelSize, { r: 255, g: 255, b: 255, a: 150 });
 
@@ -1737,11 +1739,11 @@ function drawTouchControls(sw: number, sh: number): void {
   const pauseS = floorf(TOUCH_PAUSE_SIZE * s * 0.75);
   const pauseX = floorf(sw - TOUCH_PAUSE_X_OFFSET * s);
   const pauseY = floorf(TOUCH_PAUSE_Y_OFFSET * s);
-  drawRect(pauseX - pauseS, pauseY - pauseS, pauseS * 2, pauseS * 2, { r: 255, g: 255, b: 255, a: 30 });
+  bloom_draw_rect(pauseX - pauseS, pauseY - pauseS, pauseS * 2, pauseS * 2, 255, 255, 255, 30);
   const barW = floorf(4.0 * s);
   const barH = floorf(16.0 * s);
-  drawRect(pauseX - floorf(6.0 * s), pauseY - floorf(8.0 * s), barW, barH, { r: 255, g: 255, b: 255, a: 120 });
-  drawRect(pauseX + floorf(2.0 * s), pauseY - floorf(8.0 * s), barW, barH, { r: 255, g: 255, b: 255, a: 120 });
+  bloom_draw_rect(pauseX - floorf(6.0 * s), pauseY - floorf(8.0 * s), barW, barH, 255, 255, 255, 120);
+  bloom_draw_rect(pauseX + floorf(2.0 * s), pauseY - floorf(8.0 * s), barW, barH, 255, 255, 255, 120);
 }
 
 // ============================================================
@@ -1758,9 +1760,17 @@ const camera: Camera2D = {
 // Start at title screen
 GS[GI_STATE] = ST_MENU;
 
+// FPS / perf tracking (Perry-safe arrays)
+const PERF = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+// [frameCount, fpsTimer, fps, updateMs, drawMs, presentMs, lastDt, dtAccum]
+const PF_COUNT = 0; const PF_TIMER = 1; const PF_FPS = 2;
+const PF_UPDATE = 3; const PF_DRAW = 4; const PF_PRESENT = 5;
+const PF_LASTDT = 6; const PF_DTACC = 7;
+
 while (!windowShouldClose()) {
   const dt = getDeltaTime();
   const t = getTime();
+  const frameStart = getTime();
 
   // Dynamic screen size (mobile fills device screen, desktop uses SCREEN_W/SCREEN_H)
   const sw = getScreenWidth();
@@ -1793,11 +1803,14 @@ while (!windowShouldClose()) {
 
   } else if (state === ST_PLAYING) {
     // === GAMEPLAY ===
+    const tUpdate0 = getTime();
     updatePlayer(dt);
     updateEnemies(dt);
     updateCollectibles(dt, t);
     updateParticles(dt);
     updateCamera(dt, sw, sh);
+    const tUpdate1 = getTime();
+    PERF[PF_UPDATE] = (tUpdate1 - tUpdate0) * 1000.0;
 
     // Update camera struct
     camera.target.x = floorf(CAM[0]);
@@ -1805,19 +1818,31 @@ while (!windowShouldClose()) {
     camera.zoom = CAM[2];
 
     // Draw
+    const tDraw0 = getTime();
+
     drawSkyGradient(sw, sh);
     drawParallaxBg(sw, sh);
+    const tSky = getTime();
 
     beginMode2D(camera);
     drawVisibleTiles(sw, sh);
+    const tTiles = getTime();
     drawCollectibles(t);
     drawEnemies(t);
     drawPlayerCharacter(t);
     drawParticles();
     endMode2D();
+    const tWorld = getTime();
 
     drawHUD(sw, sh);
     drawTouchControls(sw, sh);
+    const tDraw1 = getTime();
+    PERF[PF_DRAW] = (tDraw1 - tDraw0) * 1000.0;
+    // Sub-timings: sky | tiles | world | hud (in tenths of ms for display)
+    PERF[6] = (tSky - tDraw0) * 10000.0;
+    PERF[7] = (tTiles - tSky) * 10000.0;
+    PERF[8] = (tWorld - tTiles) * 10000.0;
+    PERF[9] = (tDraw1 - tWorld) * 10000.0;
 
     // Pause
     if (isKeyPressed(Key.ESCAPE) || TCH[TI_PAUSE_PRESSED] > 0.5 || GP[GP_PAUSE] > 0.5) {
@@ -1898,7 +1923,20 @@ while (!windowShouldClose()) {
     }
   }
 
+  const tPresent0 = getTime();
   endDrawing();
+  const tPresent1 = getTime();
+  PERF[PF_PRESENT] = (tPresent1 - tPresent0) * 1000.0;
+
+  // FPS counter
+  PERF[PF_LASTDT] = dt;
+  PERF[PF_COUNT] = PERF[PF_COUNT] + 1.0;
+  PERF[PF_DTACC] = PERF[PF_DTACC] + dt;
+  if (PERF[PF_DTACC] >= 1.0) {
+    PERF[PF_FPS] = PERF[PF_COUNT] / PERF[PF_DTACC];
+    PERF[PF_COUNT] = 0.0;
+    PERF[PF_DTACC] = 0.0;
+  }
 }
 
 closeAudioDevice();

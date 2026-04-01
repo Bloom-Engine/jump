@@ -233,6 +233,15 @@ function savePNG(img, relPath) {
   console.log(`  PNG  ${relPath}  (${img.width}x${img.height})`);
 }
 
+function blitImage(dst, src, offsetX, offsetY) {
+  for (let y = 0; y < src.height; y++) {
+    for (let x = 0; x < src.width; x++) {
+      const [r, g, b, a] = getPixel(src, x, y);
+      if (a > 0) setPixel(dst, offsetX + x, offsetY + y, r, g, b, a);
+    }
+  }
+}
+
 // ───────────────────────────────────────────────────────
 // Color helpers
 // ───────────────────────────────────────────────────────
@@ -808,6 +817,7 @@ function generateTileset() {
   });
 
   savePNG(img, 'assets/sprites/tileset.png');
+  return img;
 }
 
 // ───────────────────────────────────────────────────────
@@ -1054,6 +1064,7 @@ function generatePlayer() {
   });
 
   savePNG(img, 'assets/sprites/player.png');
+  return img;
 }
 
 // ───────────────────────────────────────────────────────
@@ -1270,6 +1281,7 @@ function generateEnemies() {
   drawInTile(img, 3, 2, (t) => drawChaser(t, { sitting: true }));
 
   savePNG(img, 'assets/sprites/enemies.png');
+  return img;
 }
 
 // ───────────────────────────────────────────────────────
@@ -1405,6 +1417,7 @@ function generateItems() {
   });
 
   savePNG(img, 'assets/sprites/items.png');
+  return img;
 }
 
 // ───────────────────────────────────────────────────────
@@ -1481,6 +1494,7 @@ function generateUI() {
   });
 
   savePNG(img, 'assets/sprites/ui.png');
+  return img;
 }
 
 // ───────────────────────────────────────────────────────
@@ -1793,11 +1807,21 @@ function main() {
   console.log('');
 
   console.log('Generating sprite sheets...');
-  generateTileset();
-  generatePlayer();
-  generateEnemies();
-  generateItems();
-  generateUI();
+  const imgTileset = generateTileset();
+  const imgPlayer = generatePlayer();
+  const imgEnemies = generateEnemies();
+  const imgItems = generateItems();
+  const imgUI = generateUI();
+
+  console.log('');
+  console.log('Generating sprite atlas...');
+  const atlas = createImageBuffer(256, 256);
+  blitImage(atlas, imgTileset, 0, 0);
+  blitImage(atlas, imgEnemies, 128, 0);
+  blitImage(atlas, imgPlayer, 0, 64);
+  blitImage(atlas, imgItems, 0, 80);
+  blitImage(atlas, imgUI, 0, 96);
+  savePNG(atlas, 'assets/sprites/atlas.png');
 
   console.log('');
   console.log('Generating background images...');
