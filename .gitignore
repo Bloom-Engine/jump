@@ -1,6 +1,7 @@
 node_modules/
 target/
 jump
+.env
 editor
 *.o
 *.so

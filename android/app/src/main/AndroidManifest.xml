@@ -9,6 +9,7 @@
     <application
         android:allowBackup="true"
         android:label="Bloom Jump"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:hardwareAccelerated="true">
 

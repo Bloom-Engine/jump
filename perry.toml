@@ -1,25 +1,53 @@
+[android]
+distribute = "playstore"
+google_play_key = "/Users/amlug/projects/gscmaster.com/searchbird-483214-a77c096cd7bb.json"
+key_alias = "key0"
+keystore = "../jump.keystore"
+
 [build]
 opt_level = 2
 out_dir = "dist"
 
 [ios]
-bundle_id = "com.bloomengine.jump"
+bundle_id = "com.bloom.jump"
 certificate = "/Users/amlug/.perry/distribution.p12"
 distribute = "testflight"
 encryption_exempt = true
-provisioning_profile = "/Users/amlug/.perry/com_bloomengine_jump.mobileprovision"
+provisioning_profile = "/Users/amlug/.perry/com_bloom_jump.mobileprovision"
 signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
 
-[tvos]
+[linux]
+distribute = "github"
+
+[macos]
 bundle_id = "com.bloomengine.jump"
+certificate = "/Users/amlug/.perry/macos_appstore.p12"
+distribute = "both"
+encryption_exempt = true
+entitlements = ["com.apple.security.app-sandbox"]
+installer_certificate = "/Users/amlug/.perry/macos_installer.p12"
+notarize_certificate = "/Users/amlug/.perry/macos_devid.p12"
+notarize_signing_identity = "Developer ID Application: Skelpo GmbH"
+signing_identity = "Mac App Distribution: Skelpo GmbH"
 
 [project]
-build_number = 2
+build_number = 3
 bundle_id = "com.bloomengine.jump"
 entry = "src/main.ts"
 features = ["ios-game-loop"]
 name = "bloom-jump"
-version = "1.0.0"
+version = "1.0.1"
 
 [project.icons]
 source = "assets/icon.png"
+
+[tvos]
+bundle_id = "com.bloomengine.jump"
+certificate = "/Users/amlug/.perry/distribution.p12"
+distribute = "testflight"
+encryption_exempt = true
+provisioning_profile = "/Users/amlug/.perry/com_bloomengine_jump_tvos.mobileprovision"
+signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
+
+[windows]
+distribute = "github"

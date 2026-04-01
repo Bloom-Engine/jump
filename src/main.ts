@@ -28,9 +28,10 @@ import {
 import {
   initAudioDevice, closeAudioDevice,
   loadSound, playSound, setSoundVolume,
+  loadMusic, playMusic, stopMusic, updateMusicStream, setMusicVolume, isMusicPlaying,
 } from "bloom/audio";
 import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
-import { Rect, Texture, Sound } from "bloom/core";
+import { Rect, Texture, Sound, Music } from "bloom/core";
 
 // Direct FFI declaration — bypasses TypeScript wrapper object creation/property access overhead.
 // Each drawTexturePro via the wrapper creates 4 objects + 16 property lookups.
@@ -126,7 +127,7 @@ const SCALE = 2.0;
 
 // Physics
 const GRAVITY = 1200.0;
-const JUMP_VEL = -420.0;
+const JUMP_VEL = -520.0;
 const APEX_THRESHOLD = 80.0;
 const APEX_MULT = 0.4;
 const MAX_FALL = 600.0;
@@ -139,7 +140,7 @@ const COYOTE_TIME = 0.1;
 const JUMP_BUFFER = 0.1;
 const INVINCIBLE_TIME = 1.5;
 const STOMP_BOUNCE = -300.0;
-const SPRING_VEL = -550.0;
+const SPRING_VEL = -680.0;
 
 // Player hitbox (smaller than tile for forgiving collisions)
 const PW = 20.0;   // player width
@@ -173,6 +174,7 @@ const ST_PLAYING = 2.0;
 const ST_PAUSED = 4.0;
 const ST_GAME_OVER = 5.0;
 const ST_LEVEL_COMPLETE = 6.0;
+const ST_CREDITS = 7.0;
 
 // Pool sizes
 const MAX_ENEMIES = 30;
@@ -279,6 +281,26 @@ const sndDeath = loadSound("assets/sounds/death.wav");
 const sndGem = loadSound("assets/sounds/gem.wav");
 const sndComplete = loadSound("assets/sounds/complete.wav");
 const sndSelect = loadSound("assets/sounds/select.wav");
+
+// Load music
+const musMenu = loadMusic("assets/sounds/music_menu.wav");
+const musGame = loadMusic("assets/sounds/music_game.wav");
+setMusicVolume(musMenu, 0.5);
+setMusicVolume(musGame, 0.5);
+
+// Music state: [currentTrack] — 0=none, 1=menu, 2=game
+const MUS = [0.0];
+
+function switchMusic(track: number): void {
+  if (MUS[0] > 0.5 && MUS[0] < 1.5) stopMusic(musMenu);
+  if (MUS[0] > 1.5 && MUS[0] < 2.5) stopMusic(musGame);
+  MUS[0] = track;
+  if (track > 0.5 && track < 1.5) playMusic(musMenu);
+  if (track > 1.5 && track < 2.5) playMusic(musGame);
+}
+
+// Credits scroll state: [scrollY]
+const CRED = [0.0];
 
 // Initialize pools
 for (let i = 0; i < MAX_ENEMIES; i = i + 1) {
@@ -1456,9 +1478,9 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
   drawText(subText, floorf((sw - subW) / 2.0), floorf(190.0 * s), subSize, { r: 220, g: 220, b: 255, a: 255 });
 
   // Menu options
-  const menuCount = MOBILE > 0.5 ? 1 : 2;
+  const menuCount = 2;
   const menuSize = floorf(30.0 * s);
-  const options = ["Play Game", "Level Editor (run ./editor)"];
+  const options = ["Play Game", "Info"];
   const selIdx = floorf(GS[GI_SEL]);
   for (let i = 0; i < menuCount; i = i + 1) {
     const label = options[i];
@@ -1488,8 +1510,22 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
   }
 }
 
+function selectMenuItem(sw: number, sh: number): void {
+  const sel = floorf(GS[GI_SEL]);
+  if (sel === 0) {
+    discoverLevels();
+    GS[GI_STATE] = ST_LEVEL_SELECT;
+    GS[GI_SEL] = 0.0;
+    playSound(sndSelect);
+  } else if (sel === 1) {
+    CRED[0] = 0.0;
+    GS[GI_STATE] = ST_CREDITS;
+    playSound(sndSelect);
+  }
+}
+
 function updateTitleScreen(sw: number, sh: number): void {
-  const menuMax = MOBILE > 0.5 ? 0.0 : 1.0;
+  const menuMax = 1.0;
   // Keyboard / gamepad navigation
   if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S) || GP[GP_DOWN] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
@@ -1502,30 +1538,221 @@ function updateTitleScreen(sw: number, sh: number): void {
     playSound(sndSelect);
   }
   if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE) || GP[GP_CONFIRM] > 0.5) {
-    const sel = floorf(GS[GI_SEL]);
-    if (sel === 0) {
-      discoverLevels();
-      GS[GI_STATE] = ST_LEVEL_SELECT;
-      GS[GI_SEL] = 0.0;
-      playSound(sndSelect);
-    }
+    selectMenuItem(sw, sh);
   }
-  // Touch: tap on "Play Game" area
+  // Touch: tap on menu items
   if (MOBILE > 0.5) {
     const s = UI[UI_SCALE];
-    const menuY = floorf(300.0 * s);
-    const menuH = floorf(50.0 * s);
     const tc = getTouchCount();
     for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
       const tx = getTouchX(ti);
       const ty = getTouchY(ti);
-      if (ty > menuY - 10.0 && ty < menuY + menuH && tx > sw * 0.1 && tx < sw * 0.9) {
-        discoverLevels();
-        GS[GI_STATE] = ST_LEVEL_SELECT;
-        GS[GI_SEL] = 0.0;
-        playSound(sndSelect);
+      if (tx > sw * 0.1 && tx < sw * 0.9) {
+        for (let mi = 0.0; mi < 2.0; mi = mi + 1.0) {
+          const itemY = floorf((300.0 + mi * 50.0) * s);
+          if (ty > itemY - 10.0 && ty < itemY + floorf(40.0 * s)) {
+            GS[GI_SEL] = mi;
+            selectMenuItem(sw, sh);
+          }
+        }
       }
     }
+  }
+}
+
+// ============================================================
+// CREDITS SCREEN
+// ============================================================
+
+// Credits line types: 0=gap, 1=heading, 2=subheading, 3=body, 4=small
+// Each entry: [type, text]
+const CREDITS_TYPE: number[] = [];
+const CREDITS_TEXT: string[] = [];
+
+function addCredit(lineType: number, text: string): void {
+  CREDITS_TYPE.push(lineType);
+  CREDITS_TEXT.push(text);
+}
+
+// Build credits content
+addCredit(1, "BLOOM JUMP");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(2, "- A Skelpo Production -");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(1, "Produced by");
+addCredit(0, "");
+addCredit(3, "Skelpo GmbH");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(1, "Game Design");
+addCredit(0, "");
+addCredit(3, "Skelpo GmbH");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(1, "Programming");
+addCredit(0, "");
+addCredit(3, "Skelpo GmbH");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(1, "Art & Sound");
+addCredit(0, "");
+addCredit(3, "Skelpo GmbH");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(2, "- - - - - -");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(1, "Built with");
+addCredit(0, "");
+addCredit(3, "Bloom Engine");
+addCredit(4, "A native game engine for TypeScript");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(1, "Compiled with");
+addCredit(0, "");
+addCredit(3, "Perry");
+addCredit(4, "TypeScript to native code compiler");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(2, "- - - - - -");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(4, "No frameworks were harmed");
+addCredit(4, "in the making of this game.");
+addCredit(0, "");
+addCredit(4, "Pure TypeScript. Compiled to native.");
+addCredit(4, "No VM. No interpreter. No GC.");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(2, "Thank you for playing!");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(0, "");
+addCredit(4, "(C) 2026 Skelpo GmbH");
+addCredit(4, "All rights reserved.");
+
+const CREDITS_SCROLL_SPEED = 40.0;
+
+function getCreditsLineHeight(lineType: number, s: number): number {
+  if (lineType < 0.5) return floorf(24.0 * s);
+  if (lineType < 1.5) return floorf(50.0 * s);
+  if (lineType < 2.5) return floorf(40.0 * s);
+  if (lineType < 3.5) return floorf(36.0 * s);
+  return floorf(28.0 * s);
+}
+
+function getCreditsLineSize(lineType: number, s: number): number {
+  if (lineType < 0.5) return 0;
+  if (lineType < 1.5) return floorf(36.0 * s);
+  if (lineType < 2.5) return floorf(24.0 * s);
+  if (lineType < 3.5) return floorf(28.0 * s);
+  return floorf(16.0 * s);
+}
+
+function drawCreditsScreen(t: number, dt: number, sw: number, sh: number): void {
+  clearBackground({ r: 0, g: 0, b: 0, a: 255 });
+
+  // Starfield effect
+  const starSeed = 42.0;
+  for (let i = 0.0; i < 60.0; i = i + 1.0) {
+    const sx = ((i * 137.5 + starSeed * 73.0) % sw);
+    const rawY = ((i * 251.3 + starSeed * 41.0) % sh) - (CRED[0] * (0.2 + i % 3.0 * 0.1)) % sh;
+    let sy = rawY % sh;
+    if (sy < 0.0) sy = sy + sh;
+    const twinkle = Math.sin(t * (2.0 + i * 0.3) + i) * 0.3 + 0.7;
+    const alpha = floorf(120.0 * twinkle);
+    const sz = 1.0 + (i % 3.0) * 0.5;
+    bloom_draw_rect(floorf(sx), floorf(sy), floorf(sz), floorf(sz), 255, 255, 255, alpha);
+  }
+
+  const s = UI[UI_SCALE];
+  const scrollY = CRED[0];
+
+  // Calculate start Y: begin off-screen at the bottom
+  let lineY = sh + 40.0 - scrollY;
+
+  for (let i = 0; i < CREDITS_TYPE.length; i = i + 1) {
+    const lineType = CREDITS_TYPE[i];
+    const lineH = getCreditsLineHeight(lineType, s);
+    const fontSize = getCreditsLineSize(lineType, s);
+
+    // Skip if off screen
+    if (lineY + lineH < 0.0) {
+      lineY = lineY + lineH;
+      continue;
+    }
+    if (lineY > sh) {
+      lineY = lineY + lineH;
+      continue;
+    }
+
+    // Fade at edges
+    let alpha = 255.0;
+    if (lineY < 80.0 * s) {
+      alpha = 255.0 * (lineY / (80.0 * s));
+      if (alpha < 0.0) alpha = 0.0;
+    }
+    if (lineY > sh - 60.0 * s) {
+      alpha = 255.0 * ((sh - lineY) / (60.0 * s));
+      if (alpha < 0.0) alpha = 0.0;
+    }
+    const a = floorf(alpha);
+
+    if (fontSize > 0) {
+      const text = CREDITS_TEXT[i];
+      const tw = measureText(text, fontSize);
+      const tx = floorf((sw - tw) / 2.0);
+      const ty = floorf(lineY);
+
+      if (lineType < 1.5) {
+        // Heading — bright gold
+        drawText(text, tx, ty, fontSize, { r: 255, g: 220, b: 80, a: a });
+      } else if (lineType < 2.5) {
+        // Subheading — soft cyan
+        drawText(text, tx, ty, fontSize, { r: 120, g: 220, b: 255, a: a });
+      } else if (lineType < 3.5) {
+        // Body — white
+        drawText(text, tx, ty, fontSize, { r: 255, g: 255, b: 255, a: a });
+      } else {
+        // Small — dim
+        drawText(text, tx, ty, fontSize, { r: 160, g: 160, b: 180, a: a });
+      }
+    }
+
+    lineY = lineY + lineH;
+  }
+
+  // Top/bottom gradient overlays for cinematic fade
+  for (let g = 0.0; g < 40.0; g = g + 1.0) {
+    const ga = floorf(255.0 * (1.0 - g / 40.0));
+    bloom_draw_rect(0, floorf(g * s), sw, floorf(s + 1.0), 0, 0, 0, ga);
+    bloom_draw_rect(0, floorf(sh - (g + 1.0) * s), sw, floorf(s + 1.0), 0, 0, 0, ga);
+  }
+
+  // Scroll
+  CRED[0] = CRED[0] + CREDITS_SCROLL_SPEED * dt;
+
+  // Calculate total height
+  let totalH = sh + 40.0;
+  for (let i = 0; i < CREDITS_TYPE.length; i = i + 1) {
+    totalH = totalH + getCreditsLineHeight(CREDITS_TYPE[i], s);
+  }
+  totalH = totalH + sh * 0.5;
+
+  // Return to menu when scrolled past everything, or on any key/touch
+  let dismiss = 0.0;
+  if (CRED[0] > totalH) dismiss = 1.0;
+  if (isKeyPressed(Key.ESCAPE) || isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE)) dismiss = 1.0;
+  if (GP[GP_CONFIRM] > 0.5 || GP[GP_PAUSE] > 0.5) dismiss = 1.0;
+  if (MOBILE > 0.5 && getTouchCount() > 0.0) dismiss = 1.0;
+  if (dismiss > 0.5) {
+    GS[GI_STATE] = ST_MENU;
+    GS[GI_SEL] = 0.0;
   }
 }
 
@@ -1593,6 +1820,7 @@ function updateLevelSelect(sw: number, sh: number): void {
     if (count > 0) {
       startLevel(floorf(GS[GI_SEL]));
       GS[GI_STATE] = ST_PLAYING;
+      switchMusic(2.0);
       playSound(sndSelect);
     }
   }
@@ -1612,6 +1840,7 @@ function updateLevelSelect(sw: number, sh: number): void {
         if (ty > oy - 4.0 * s && ty < oy + 36.0 * s && tx > 40.0 * s && tx < sw - 40.0 * s) {
           startLevel(floorf(li));
           GS[GI_STATE] = ST_PLAYING;
+          switchMusic(2.0);
           playSound(sndSelect);
         }
       }
@@ -1759,6 +1988,7 @@ const camera: Camera2D = {
 
 // Start at title screen
 GS[GI_STATE] = ST_MENU;
+switchMusic(1.0);
 
 // FPS / perf tracking (Perry-safe arrays)
 const PERF = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
@@ -1783,6 +2013,10 @@ while (!windowShouldClose()) {
   const shortDim = sw < sh ? sw : sh;
   UI[UI_SCALE] = shortDim / DESIGN_H;
 
+  // Update music stream (must be called every frame)
+  if (MUS[0] > 0.5 && MUS[0] < 1.5) updateMusicStream(musMenu);
+  if (MUS[0] > 1.5 && MUS[0] < 2.5) updateMusicStream(musGame);
+
   // Process platform input
   updateTouchInput(sw, sh);
   updateGamepadInput();
@@ -1800,6 +2034,10 @@ while (!windowShouldClose()) {
     // === LEVEL SELECT ===
     updateLevelSelect(sw, sh);
     drawLevelSelect(t, sw, sh);
+
+  } else if (state === ST_CREDITS) {
+    // === CREDITS ===
+    drawCreditsScreen(t, dt, sw, sh);
 
   } else if (state === ST_PLAYING) {
     // === GAMEPLAY ===
@@ -1872,6 +2110,7 @@ while (!windowShouldClose()) {
     if (isKeyPressed(Key.Q) || GP[GP_PAUSE] > 0.5) {
       GS[GI_STATE] = ST_MENU;
       GS[GI_SEL] = 0.0;
+      switchMusic(1.0);
     }
     // Touch: tap Resume or Quit areas
     if (MOBILE > 0.5) {
@@ -1882,7 +2121,7 @@ while (!windowShouldClose()) {
         const tx = getTouchX(ti);
         if (tx > sw * 0.2 && tx < sw * 0.8) {
           if (ty > 280.0 * ps && ty < 320.0 * ps) GS[GI_STATE] = ST_PLAYING;
-          if (ty > 330.0 * ps && ty < 370.0 * ps) { GS[GI_STATE] = ST_MENU; GS[GI_SEL] = 0.0; }
+          if (ty > 330.0 * ps && ty < 370.0 * ps) { GS[GI_STATE] = ST_MENU; GS[GI_SEL] = 0.0; switchMusic(1.0); }
         }
       }
     }
@@ -1896,6 +2135,7 @@ while (!windowShouldClose()) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL];
       P[PI_LIVES] = 3.0;
+      switchMusic(1.0);
     }
 
   } else if (state === ST_LEVEL_COMPLETE) {
@@ -1920,6 +2160,7 @@ while (!windowShouldClose()) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL] + 1.0;
       if (GS[GI_SEL] >= GS[GI_LCOUNT]) GS[GI_SEL] = 0.0;
+      switchMusic(1.0);
     }
   }
 
