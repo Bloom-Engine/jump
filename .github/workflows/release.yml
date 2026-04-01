@@ -269,10 +269,16 @@ jobs:
 
       - name: Upload to release
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          for f in dist/*windows*; do
-            [ -f "$f" ] && gh release upload "$GITHUB_REF_NAME" "$f" --clobber
-          done
+          shopt -s nullglob
+          files=(dist/*.exe dist/*windows*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::No Windows artifacts found in dist/"
+            ls -la dist/ || true
+          else
+            for f in "${files[@]}"; do
+              gh release upload "$GITHUB_REF_NAME" "$f" --clobber
+            done
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -313,9 +319,15 @@ jobs:
 
       - name: Upload to release
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          for f in dist/*linux*; do
-            [ -f "$f" ] && gh release upload "$GITHUB_REF_NAME" "$f" --clobber
-          done
+          shopt -s nullglob
+          files=(dist/*.AppImage dist/*linux*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::No Linux artifacts found in dist/"
+            ls -la dist/ || true
+          else
+            for f in "${files[@]}"; do
+              gh release upload "$GITHUB_REF_NAME" "$f" --clobber
+            done
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
