@@ -254,7 +254,7 @@ const LEVEL_FILES: string[] = [];
 // INITIALIZATION
 // ============================================================
 
-initWindow(SCREEN_W, SCREEN_H, "Bloom Jump");
+initWindow(SCREEN_W, SCREEN_H, "Bloom Jump", false);
 setTargetFPS(60);
 initAudioDevice();
 
