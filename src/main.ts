@@ -832,7 +832,7 @@ function discoverLevels(): void {
   LEVEL_FILES.length = 0;
   // Check built-in levels
   for (let i = 1; i <= 10; i = i + 1) {
-    const path = "levels/level" + i.toString() + ".txt";
+    const path = "assets/levels/level" + i.toString() + ".txt";
     if (fileExists(path)) {
       LEVEL_FILES.push(path);
       LEVEL_NAMES.push("Level " + i.toString());
@@ -840,7 +840,7 @@ function discoverLevels(): void {
   }
   // Check custom levels
   for (let i = 1; i <= 20; i = i + 1) {
-    const path = "levels/custom_" + i.toString() + ".txt";
+    const path = "assets/levels/custom_" + i.toString() + ".txt";
     if (fileExists(path)) {
       LEVEL_FILES.push(path);
       LEVEL_NAMES.push("Custom " + i.toString());
@@ -1771,7 +1771,7 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
   const rowH = floorf(40.0 * s);
   if (count < 1) {
     const emptySize = floorf(20.0 * s);
-    drawText("No levels found in levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
+    drawText("No levels found in assets/levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
     drawText("Run the editor to create levels!", floorf(170.0 * s), floorf(290.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
   }
 

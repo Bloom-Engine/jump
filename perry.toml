@@ -13,6 +13,7 @@ bundle_id = "com.bloom.jump"
 certificate = "/Users/amlug/.perry/distribution.p12"
 distribute = "testflight"
 encryption_exempt = true
+orientations = ["landscape"]
 provisioning_profile = "/Users/amlug/.perry/com_bloom_jump.mobileprovision"
 signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
 

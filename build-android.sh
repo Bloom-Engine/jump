@@ -69,12 +69,6 @@ echo "==> Syncing assets..."
 mkdir -p "$ASSETS_DST"
 rsync -a --delete --checksum "$ASSETS_SRC/" "$ASSETS_DST/"
 
-LEVELS_SRC="levels"
-LEVELS_DST="android/app/src/main/assets/levels"
-echo "==> Syncing levels..."
-mkdir -p "$LEVELS_DST"
-rsync -a --delete --checksum "$LEVELS_SRC/" "$LEVELS_DST/"
-
 # ── Step 4: Build APK ───────────────────────
 echo "==> Building APK ($BUILD_TYPE)..."
 cd android

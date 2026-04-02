@@ -474,21 +474,21 @@ function discoverFiles(): void {
   FILE_LIST.length = 0;
   FILE_NAMES.length = 0;
   for (let i = 1; i <= 10; i = i + 1) {
-    const path = "levels/level" + i.toString() + ".txt";
+    const path = "assets/levels/level" + i.toString() + ".txt";
     if (fileExists(path)) { FILE_LIST.push(path); FILE_NAMES.push("Level " + i.toString()); }
   }
   for (let i = 1; i <= 30; i = i + 1) {
-    const path = "levels/custom_" + i.toString() + ".txt";
+    const path = "assets/levels/custom_" + i.toString() + ".txt";
     if (fileExists(path)) { FILE_LIST.push(path); FILE_NAMES.push("Custom " + i.toString()); }
   }
 }
 
 function findNextCustomName(): string {
   for (let i = 1; i <= 99; i = i + 1) {
-    const path = "levels/custom_" + i.toString() + ".txt";
+    const path = "assets/levels/custom_" + i.toString() + ".txt";
     if (!fileExists(path)) return path;
   }
-  return "levels/custom_99.txt";
+  return "assets/levels/custom_99.txt";
 }
 
 // ============================================================
