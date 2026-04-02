@@ -164,12 +164,14 @@ jobs:
         run: |
           echo "${{ secrets.APPLE_APPSTORE_P12 }}" | base64 -d > /tmp/macos_appstore.p12
           echo "${{ secrets.APPLE_INSTALLER_P12 }}" | base64 -d > /tmp/macos_installer.p12
+          echo "${{ secrets.APPLE_DEVID_P12 }}" | base64 -d > /tmp/macos_devid.p12
           echo "${{ secrets.APPLE_P8_KEY }}" | base64 -d > /tmp/appstore_connect.p8
 
       - name: Inject credential paths into perry.toml
         run: |
           sed -i '/^\[macos\]/,/^\[/{s|^certificate = .*|certificate = "/tmp/macos_appstore.p12"|}' perry.toml
           sed -i '/^\[macos\]/,/^\[/{s|^installer_certificate = .*|installer_certificate = "/tmp/macos_installer.p12"|}' perry.toml
+          sed -i '/^\[macos\]/,/^\[/{s|^notarize_certificate = .*|notarize_certificate = "/tmp/macos_devid.p12"|}' perry.toml
 
       - name: Publish macOS to App Store
         run: |

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.bloomengine.jump"
+    namespace = "com.bloom.jump"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.bloomengine.jump"
+        applicationId = "com.bloom.jump"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

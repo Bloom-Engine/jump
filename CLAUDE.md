@@ -37,7 +37,7 @@ perry compile src/editor.ts -o editor && ./editor
 perry compile --target ios-simulator --features ios-game-loop src/main.ts -o bloom_jump
 /usr/libexec/PlistBuddy -c "Delete :UIApplicationSceneManifest" bloom_jump.app/Info.plist
 xcrun simctl install booted bloom_jump.app
-xcrun simctl launch booted com.bloomengine.jump
+xcrun simctl launch booted com.bloom.jump
 
 # iOS Device
 perry compile --target ios --features ios-game-loop src/main.ts -o BloomJump
@@ -98,4 +98,4 @@ Platform detection via `isMobile()` and `isTV()` from bloom/core. Touch state st
 - iOS asset paths are auto-resolved to app bundle by native layer's `resolve_path()`
 - Android assets extracted from APK to filesDir; `BLOOM_ASSET_PATH` env var set before loadLibrary
 - `UIApplicationSceneManifest` must be deleted from Info.plist after iOS builds
-- iOS provisioning profile needed at `/Users/amlug/.perry/com_bloomengine_jump.mobileprovision`
+- iOS provisioning profile needed at `/Users/amlug/.perry/com_bloom_jump.mobileprovision`

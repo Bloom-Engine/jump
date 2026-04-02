@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.bloomengine.jump">
+    package="com.bloom.jump">
 
     <!-- Hardware features for Vulkan rendering -->
     <uses-feature android:name="android.hardware.vulkan.level" android:version="0" android:required="false" />

@@ -46,7 +46,7 @@ SO_OUTPUT="bloom_jump"
 JNILIBS_DIR="android/app/src/main/jniLibs/arm64-v8a"
 ASSETS_SRC="assets"
 ASSETS_DST="android/app/src/main/assets/assets"
-PACKAGE="com.bloomengine.jump"
+PACKAGE="com.bloom.jump"
 ACTIVITY=".BloomActivity"
 
 # ── Step 1: Compile with Perry ───────────────
