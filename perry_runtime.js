@@ -3201,9 +3201,7 @@ async function bootPerryWasm(wasmBase64, ffiImports) {
   wasmInstance = instance;
   wasmMemory = instance.exports.memory;
   // Expose closure caller for external use (e.g., bloom_run_game rAF loop)
-  // handleI64: BigInt i64 from FFI bridge, argF64: plain JS number
   globalThis.__perryClosureCall1 = (handleI64, argF64) => {
-    // Convert BigInt i64 → f64 (NaN-boxed pointer)
     const handleF64 = u64ToF64(typeof handleI64 === 'bigint' ? handleI64 : f64ToU64(handleI64));
     const c = getHandle(handleF64);
     if (!c || !instance) return;
@@ -3223,7 +3221,7 @@ const __asyncFuncImpls = {
   __async_loadSoundAsync: (__p0) => {
     const __p = (async () => {
         let __l27 = fromJsValue(await toJsValue(u64ToF64(TAG_UNDEFINED)));
-        let __l28 = u64ToF64(TAG_UNDEFINED)(__l27);
+        let __l28 = fromJsValue(wasmInstance.exports.__wasm_func_229)(__l27);
         return fromJsValue({'handle': toJsValue(__l28)});
       return u64ToF64(TAG_UNDEFINED);
     })();
@@ -3232,7 +3230,7 @@ const __asyncFuncImpls = {
   __async_loadMusicAsync: (__p0) => {
     const __p = (async () => {
         let __l30 = fromJsValue(await toJsValue(u64ToF64(TAG_UNDEFINED)));
-        let __l31 = u64ToF64(TAG_UNDEFINED)(__l30);
+        let __l31 = fromJsValue(wasmInstance.exports.__wasm_func_230)(__l30);
         return fromJsValue({'handle': toJsValue(__l31)});
       return u64ToF64(TAG_UNDEFINED);
     })();
@@ -3241,9 +3239,9 @@ const __asyncFuncImpls = {
   __async_loadTextureAsync: (__p0) => {
     const __p = (async () => {
         let __l42 = fromJsValue(await toJsValue(u64ToF64(TAG_UNDEFINED)));
-        let __l43 = u64ToF64(TAG_UNDEFINED)(__l42);
-        let __l44 = u64ToF64(TAG_UNDEFINED)(__l43);
-        let __l45 = u64ToF64(TAG_UNDEFINED)(__l43);
+        let __l43 = fromJsValue(wasmInstance.exports.__wasm_func_311)(__l42);
+        let __l44 = fromJsValue(wasmInstance.exports.__wasm_func_300)(__l43);
+        let __l45 = fromJsValue(wasmInstance.exports.__wasm_func_301)(__l43);
         return fromJsValue({'id': toJsValue(__l43), 'width': toJsValue(__l44), 'height': toJsValue(__l45)});
       return u64ToF64(TAG_UNDEFINED);
     })();
