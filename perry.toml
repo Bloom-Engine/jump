@@ -13,7 +13,6 @@ bundle_id = "com.bloom.jump"
 certificate = "/Users/amlug/.perry/distribution.p12"
 distribute = "testflight"
 encryption_exempt = true
-orientations = ["landscape"]
 provisioning_profile = "/Users/amlug/.perry/com_bloom_jump.mobileprovision"
 signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
 
@@ -32,12 +31,12 @@ notarize_signing_identity = "Developer ID Application: Skelpo GmbH"
 signing_identity = "Mac App Distribution: Skelpo GmbH"
 
 [project]
-build_number = 9
+build_number = 10
 bundle_id = "com.bloom.jump"
 entry = "src/main.ts"
 features = ["ios-game-loop"]
 name = "bloom-jump"
-version = "1.0.7"
+version = "1.0.8"
 
 [project.icons]
 source = "assets/icon.png"
