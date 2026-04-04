@@ -26,8 +26,12 @@ jobs:
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
+          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_ios.a' --dir /tmp/bloom-native
           mkdir -p vendor/bloom/native/ios/target/aarch64-apple-ios/release
-          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_ios.a' --dir vendor/bloom/native/ios/target/aarch64-apple-ios/release
+          cp /tmp/bloom-native/libbloom_ios.a vendor/bloom/native/ios/target/aarch64-apple-ios/release/
+          mkdir -p vendor/bloom/native/ios/target/release
+          cp /tmp/bloom-native/libbloom_ios.a vendor/bloom/native/ios/target/release/
+          cp /tmp/bloom-native/libbloom_ios.a vendor/bloom/native/ios/
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -94,8 +98,12 @@ jobs:
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
+          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_tvos.a' --dir /tmp/bloom-native
           mkdir -p vendor/bloom/native/tvos/target/aarch64-apple-tvos/release
-          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_tvos.a' --dir vendor/bloom/native/tvos/target/aarch64-apple-tvos/release
+          cp /tmp/bloom-native/libbloom_tvos.a vendor/bloom/native/tvos/target/aarch64-apple-tvos/release/
+          mkdir -p vendor/bloom/native/tvos/target/release
+          cp /tmp/bloom-native/libbloom_tvos.a vendor/bloom/native/tvos/target/release/
+          cp /tmp/bloom-native/libbloom_tvos.a vendor/bloom/native/tvos/
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -162,8 +170,10 @@ jobs:
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
+          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_macos.a' --dir /tmp/bloom-native
           mkdir -p vendor/bloom/native/macos/target/release
-          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_macos.a' --dir vendor/bloom/native/macos/target/release
+          cp /tmp/bloom-native/libbloom_macos.a vendor/bloom/native/macos/target/release/
+          cp /tmp/bloom-native/libbloom_macos.a vendor/bloom/native/macos/
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -231,8 +241,12 @@ jobs:
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
+          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_android.a' --dir /tmp/bloom-native
           mkdir -p vendor/bloom/native/android/target/aarch64-linux-android/release
-          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_android.a' --dir vendor/bloom/native/android/target/aarch64-linux-android/release
+          cp /tmp/bloom-native/libbloom_android.a vendor/bloom/native/android/target/aarch64-linux-android/release/
+          mkdir -p vendor/bloom/native/android/target/release
+          cp /tmp/bloom-native/libbloom_android.a vendor/bloom/native/android/target/release/
+          cp /tmp/bloom-native/libbloom_android.a vendor/bloom/native/android/
         env:
           GH_TOKEN: ${{ github.token }}
 
