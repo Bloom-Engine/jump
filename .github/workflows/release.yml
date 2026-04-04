@@ -72,6 +72,21 @@ jobs:
           sed -i '/^\[ios\]/,/^\[/{s|^certificate = .*|certificate = "/tmp/ios_distribution.p12"|}' perry.toml
           sed -i '/^\[ios\]/,/^\[/{s|^provisioning_profile = .*|provisioning_profile = "/tmp/ios.mobileprovision"|}' perry.toml
 
+      - name: Debug vendor contents
+        run: |
+          echo "=== package.json ==="
+          cat package.json
+          echo "=== vendor/bloom/native/ios/ ==="
+          ls -la vendor/bloom/native/ios/ || echo "dir not found"
+          echo "=== vendor/bloom/native/ios/target/ ==="
+          find vendor/bloom/native/ios/target -type f 2>/dev/null || echo "no target dir"
+          echo "=== .a files anywhere in vendor ==="
+          find vendor/ -name "*.a" -type f 2>/dev/null || echo "none"
+          echo "=== git status ==="
+          git status --short | head -20
+          echo "=== git log ==="
+          git log --oneline -3
+
       - name: Publish iOS to TestFlight
         run: |
           perry publish ios \
