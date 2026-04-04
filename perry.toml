@@ -31,12 +31,12 @@ notarize_signing_identity = "Developer ID Application: Skelpo GmbH"
 signing_identity = "Mac App Distribution: Skelpo GmbH"
 
 [project]
-build_number = 26
+build_number = 27
 bundle_id = "com.bloom.jump"
 entry = "src/main.ts"
 features = ["ios-game-loop"]
 name = "bloom-jump"
-version = "1.0.24"
+version = "1.0.25"
 
 [project.icons]
 source = "assets/icon.png"
