@@ -22,7 +22,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install bloom engine SDK
-        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
 
       - name: Install perry
         run: |
@@ -83,7 +85,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install bloom engine SDK
-        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
 
       - name: Install perry
         run: |
@@ -144,7 +148,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install bloom engine SDK
-        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
 
       - name: Install perry
         run: |
@@ -206,7 +212,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install bloom engine SDK
-        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
 
       - name: Install perry
         run: |
@@ -256,7 +264,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install bloom engine SDK
-        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
 
       - name: Install perry
         run: |
@@ -309,7 +319,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install bloom engine SDK
-        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
 
       - name: Install perry
         run: |
