@@ -24,6 +24,7 @@ jobs:
       - name: Install bloom engine SDK
         run: |
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -f vendor/bloom/.gitignore
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_ios.a' --dir /tmp/bloom-native
@@ -96,6 +97,7 @@ jobs:
       - name: Install bloom engine SDK
         run: |
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -f vendor/bloom/.gitignore
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_tvos.a' --dir /tmp/bloom-native
@@ -168,6 +170,7 @@ jobs:
       - name: Install bloom engine SDK
         run: |
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -f vendor/bloom/.gitignore
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_macos.a' --dir /tmp/bloom-native
@@ -239,6 +242,7 @@ jobs:
       - name: Install bloom engine SDK
         run: |
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -f vendor/bloom/.gitignore
           sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_android.a' --dir /tmp/bloom-native
