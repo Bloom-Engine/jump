@@ -29,9 +29,35 @@ jobs:
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_ios.a' --dir /tmp/bloom-native
           cp /tmp/bloom-native/libbloom_ios.a vendor/bloom/native/ios/libbloom_ios.bin
-          printf '[package]\nname = "bloom-ios"\nversion = "0.1.0"\nedition = "2021"\nbuild = "build.rs"\n\n[lib]\nname = "bloom_ios"\ncrate-type = ["staticlib"]\n' > vendor/bloom/native/ios/Cargo.toml
+          cat > vendor/bloom/native/ios/Cargo.toml << 'TOML'
+          [package]
+          name = "bloom-ios"
+          version = "0.1.0"
+          edition = "2021"
+          build = "build.rs"
+          [lib]
+          name = "bloom_ios"
+          TOML
+          sed -i 's/^          //' vendor/bloom/native/ios/Cargo.toml
           mkdir -p vendor/bloom/native/ios/src && touch vendor/bloom/native/ios/src/lib.rs
-          printf 'fn main() {\n    let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();\n    let out = std::env::var("OUT_DIR").unwrap();\n    std::fs::copy(format!("{}/libbloom_ios.bin", dir), format!("{}/libbloomprebuilt.a", out)).unwrap();\n    println!("cargo:rustc-link-search=native={}", out);\n    println!("cargo:rustc-link-lib=static:+whole-archive=bloomprebuilt");\n}\n' > vendor/bloom/native/ios/build.rs
+          cat > vendor/bloom/native/ios/build.rs << 'BUILDRS'
+          fn main() {
+              let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+              let target = std::env::var("TARGET").unwrap_or_default();
+              let lib = "libbloom_ios";
+              let out = if target.is_empty() {
+                  format!("{}/target/release", dir)
+              } else {
+                  format!("{}/target/{}/release", dir, target)
+              };
+              std::fs::create_dir_all(&out).unwrap();
+              std::fs::copy(
+                  format!("{}/{}.bin", dir, lib),
+                  format!("{}/{}.a", out, lib),
+              ).unwrap();
+          }
+          BUILDRS
+          sed -i 's/^          //' vendor/bloom/native/ios/build.rs
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -101,9 +127,35 @@ jobs:
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_tvos.a' --dir /tmp/bloom-native
           cp /tmp/bloom-native/libbloom_tvos.a vendor/bloom/native/tvos/libbloom_tvos.bin
-          printf '[package]\nname = "bloom-tvos"\nversion = "0.1.0"\nedition = "2021"\nbuild = "build.rs"\n\n[lib]\nname = "bloom_tvos"\ncrate-type = ["staticlib"]\n' > vendor/bloom/native/tvos/Cargo.toml
+          cat > vendor/bloom/native/tvos/Cargo.toml << 'TOML'
+          [package]
+          name = "bloom-tvos"
+          version = "0.1.0"
+          edition = "2021"
+          build = "build.rs"
+          [lib]
+          name = "bloom_tvos"
+          TOML
+          sed -i 's/^          //' vendor/bloom/native/tvos/Cargo.toml
           mkdir -p vendor/bloom/native/tvos/src && touch vendor/bloom/native/tvos/src/lib.rs
-          printf 'fn main() {\n    let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();\n    let out = std::env::var("OUT_DIR").unwrap();\n    std::fs::copy(format!("{}/libbloom_tvos.bin", dir), format!("{}/libbloomprebuilt.a", out)).unwrap();\n    println!("cargo:rustc-link-search=native={}", out);\n    println!("cargo:rustc-link-lib=static:+whole-archive=bloomprebuilt");\n}\n' > vendor/bloom/native/tvos/build.rs
+          cat > vendor/bloom/native/tvos/build.rs << 'BUILDRS'
+          fn main() {
+              let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+              let target = std::env::var("TARGET").unwrap_or_default();
+              let lib = "libbloom_tvos";
+              let out = if target.is_empty() {
+                  format!("{}/target/release", dir)
+              } else {
+                  format!("{}/target/{}/release", dir, target)
+              };
+              std::fs::create_dir_all(&out).unwrap();
+              std::fs::copy(
+                  format!("{}/{}.bin", dir, lib),
+                  format!("{}/{}.a", out, lib),
+              ).unwrap();
+          }
+          BUILDRS
+          sed -i 's/^          //' vendor/bloom/native/tvos/build.rs
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -173,9 +225,35 @@ jobs:
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_macos.a' --dir /tmp/bloom-native
           cp /tmp/bloom-native/libbloom_macos.a vendor/bloom/native/macos/libbloom_macos.bin
-          printf '[package]\nname = "bloom-macos"\nversion = "0.1.0"\nedition = "2021"\nbuild = "build.rs"\n\n[lib]\nname = "bloom_macos"\ncrate-type = ["staticlib"]\n' > vendor/bloom/native/macos/Cargo.toml
+          cat > vendor/bloom/native/macos/Cargo.toml << 'TOML'
+          [package]
+          name = "bloom-macos"
+          version = "0.1.0"
+          edition = "2021"
+          build = "build.rs"
+          [lib]
+          name = "bloom_macos"
+          TOML
+          sed -i 's/^          //' vendor/bloom/native/macos/Cargo.toml
           mkdir -p vendor/bloom/native/macos/src && touch vendor/bloom/native/macos/src/lib.rs
-          printf 'fn main() {\n    let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();\n    let out = std::env::var("OUT_DIR").unwrap();\n    std::fs::copy(format!("{}/libbloom_macos.bin", dir), format!("{}/libbloomprebuilt.a", out)).unwrap();\n    println!("cargo:rustc-link-search=native={}", out);\n    println!("cargo:rustc-link-lib=static:+whole-archive=bloomprebuilt");\n}\n' > vendor/bloom/native/macos/build.rs
+          cat > vendor/bloom/native/macos/build.rs << 'BUILDRS'
+          fn main() {
+              let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+              let target = std::env::var("TARGET").unwrap_or_default();
+              let lib = "libbloom_macos";
+              let out = if target.is_empty() {
+                  format!("{}/target/release", dir)
+              } else {
+                  format!("{}/target/{}/release", dir, target)
+              };
+              std::fs::create_dir_all(&out).unwrap();
+              std::fs::copy(
+                  format!("{}/{}.bin", dir, lib),
+                  format!("{}/{}.a", out, lib),
+              ).unwrap();
+          }
+          BUILDRS
+          sed -i 's/^          //' vendor/bloom/native/macos/build.rs
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -246,9 +324,35 @@ jobs:
           rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_android.a' --dir /tmp/bloom-native
           cp /tmp/bloom-native/libbloom_android.a vendor/bloom/native/android/libbloom_android.bin
-          printf '[package]\nname = "bloom-android"\nversion = "0.1.0"\nedition = "2021"\nbuild = "build.rs"\n\n[lib]\nname = "bloom_android"\ncrate-type = ["staticlib"]\n' > vendor/bloom/native/android/Cargo.toml
+          cat > vendor/bloom/native/android/Cargo.toml << 'TOML'
+          [package]
+          name = "bloom-android"
+          version = "0.1.0"
+          edition = "2021"
+          build = "build.rs"
+          [lib]
+          name = "bloom_android"
+          TOML
+          sed -i 's/^          //' vendor/bloom/native/android/Cargo.toml
           mkdir -p vendor/bloom/native/android/src && touch vendor/bloom/native/android/src/lib.rs
-          printf 'fn main() {\n    let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();\n    let out = std::env::var("OUT_DIR").unwrap();\n    std::fs::copy(format!("{}/libbloom_android.bin", dir), format!("{}/libbloomprebuilt.a", out)).unwrap();\n    println!("cargo:rustc-link-search=native={}", out);\n    println!("cargo:rustc-link-lib=static:+whole-archive=bloomprebuilt");\n}\n' > vendor/bloom/native/android/build.rs
+          cat > vendor/bloom/native/android/build.rs << 'BUILDRS'
+          fn main() {
+              let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+              let target = std::env::var("TARGET").unwrap_or_default();
+              let lib = "libbloom_android";
+              let out = if target.is_empty() {
+                  format!("{}/target/release", dir)
+              } else {
+                  format!("{}/target/{}/release", dir, target)
+              };
+              std::fs::create_dir_all(&out).unwrap();
+              std::fs::copy(
+                  format!("{}/{}.bin", dir, lib),
+                  format!("{}/{}.a", out, lib),
+              ).unwrap();
+          }
+          BUILDRS
+          sed -i 's/^          //' vendor/bloom/native/android/build.rs
         env:
           GH_TOKEN: ${{ github.token }}
 
