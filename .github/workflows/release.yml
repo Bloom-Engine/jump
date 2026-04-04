@@ -21,6 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install bloom engine SDK
+        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
@@ -79,6 +82,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install bloom engine SDK
+        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
@@ -136,6 +142,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install bloom engine SDK
+        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
 
       - name: Install perry
         run: |
@@ -196,6 +205,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install bloom engine SDK
+        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
+
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
@@ -242,6 +254,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install bloom engine SDK
+        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
 
       - name: Install perry
         run: |
@@ -292,6 +307,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install bloom engine SDK
+        run: git clone --depth 1 https://github.com/Bloom-Engine/engine.git node_modules/bloom
 
       - name: Install perry
         run: |
