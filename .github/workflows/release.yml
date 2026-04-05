@@ -143,7 +143,9 @@ jobs:
             --app-icon AppIcon \
             --output-partial-info-plist /tmp/assetcat.plist \
             --output-format human-readable-text
-          # Merge the actool-generated Info.plist additions into our Info.plist
+          # Replace perry's CFBundleIcons (missing nested CFBundleIconName) with actool's version
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleIcons" BloomJump.app/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleIcons~ipad" BloomJump.app/Info.plist || true
           /usr/libexec/PlistBuddy -c "Merge /tmp/assetcat.plist" BloomJump.app/Info.plist
 
       - name: Sign app
