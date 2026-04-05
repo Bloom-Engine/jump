@@ -24,6 +24,8 @@ jobs:
       - name: Install bloom engine SDK
         run: |
           git clone --depth 1 https://github.com/Bloom-Engine/engine.git ../engine
+          mkdir -p node_modules
+          ln -s ../../engine node_modules/bloom
           gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_ios.a' --dir /tmp/bloom-native
           mkdir -p ../engine/native/ios/target/aarch64-apple-ios/release
           cp /tmp/bloom-native/libbloom_ios.a ../engine/native/ios/target/aarch64-apple-ios/release/
