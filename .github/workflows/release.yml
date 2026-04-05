@@ -32,9 +32,9 @@ jobs:
 
       - name: Install perry runtime for iOS
         run: |
-          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libperry_runtime_ios.a' --dir /tmp/perry-rt
+          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libperry_runtime.a' --dir /tmp/perry-rt
           mkdir -p target/aarch64-apple-ios/release
-          cp /tmp/perry-rt/libperry_runtime_ios.a target/aarch64-apple-ios/release/libperry_runtime.a
+          cp /tmp/perry-rt/libperry_runtime.a target/aarch64-apple-ios/release/libperry_runtime.a
         env:
           GH_TOKEN: ${{ github.token }}
 
