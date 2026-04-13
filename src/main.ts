@@ -258,6 +258,7 @@ initWindow(SCREEN_W, SCREEN_H, "Bloom Jump", false);
 setTargetFPS(60);
 initAudioDevice();
 
+
 // Show loading screen
 beginDrawing();
 clearBackground(LOADING_BG);
@@ -826,14 +827,15 @@ function startLevel(index: number): void {
   CAM[1] = P[PI_Y];
 }
 
-// Discover level files
+// Discover level files (use readFile length check since fileExists has issues on Windows)
 function discoverLevels(): void {
   LEVEL_NAMES.length = 0;
   LEVEL_FILES.length = 0;
   // Check built-in levels
   for (let i = 1; i <= 10; i = i + 1) {
     const path = "assets/levels/level" + i.toString() + ".txt";
-    if (fileExists(path)) {
+    const data = readFile(path);
+    if (data.length > 0) {
       LEVEL_FILES.push(path);
       LEVEL_NAMES.push("Level " + i.toString());
     }
@@ -841,7 +843,8 @@ function discoverLevels(): void {
   // Check custom levels
   for (let i = 1; i <= 20; i = i + 1) {
     const path = "assets/levels/custom_" + i.toString() + ".txt";
-    if (fileExists(path)) {
+    const data = readFile(path);
+    if (data.length > 0) {
       LEVEL_FILES.push(path);
       LEVEL_NAMES.push("Custom " + i.toString());
     }
@@ -1508,6 +1511,7 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
     const iw = measureText("Arrow Keys / WASD to move, SPACE to jump", instrSize);
     drawText("Arrow Keys / WASD to move, SPACE to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
   }
+
 }
 
 function selectMenuItem(sw: number, sh: number): void {
