@@ -1566,7 +1566,10 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
 
   // Instructions
   const instrSize = floorf(16.0 * s);
-  if (MOBILE > 0.5) {
+  if (WATCH > 0.5) {
+    const iw = measureText("Crown to move, tap to jump", instrSize);
+    drawTextRgba("Crown to move, tap to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
+  } else if (MOBILE > 0.5) {
     const iw = measureText("Tap Play to begin", instrSize);
     drawTextRgba("Tap Play to begin", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
