@@ -34,7 +34,7 @@ signing_identity = "Mac App Distribution: Skelpo GmbH"
 build_number = 45
 bundle_id = "com.bloom.jump"
 entry = "src/main.ts"
-features = ["ios-game-loop"]
+features = ["ios-game-loop", "watchos-swift-app"]
 name = "bloom-jump"
 version = "1.0.43"
 

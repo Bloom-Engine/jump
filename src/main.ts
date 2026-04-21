@@ -11,7 +11,7 @@ import {
   getScreenWidth, getScreenHeight, closeWindow,
   beginMode2D, endMode2D, getScreenToWorld2D,
   writeFile, readFile, fileExists,
-  isMobile, isTV, getPlatform,
+  isMobile, isTV, isWatch, getPlatform, getCrownRotation,
   getTouchX, getTouchY, getTouchCount,
   isGamepadAvailable, getGamepadAxis, isGamepadButtonPressed, isGamepadButtonDown,
 } from "bloom/core";
@@ -20,7 +20,7 @@ import {
   drawRect, drawCircle, drawTriangle, drawLine, drawRectLines,
   checkCollisionRecs,
 } from "bloom/shapes";
-import { drawText, measureText } from "bloom/text";
+import { drawTextRgba, measureText } from "bloom/text";
 import {
   loadTexture, drawTexturePro, drawTextureRec,
   setTextureFilter, FILTER_NEAREST,
@@ -28,10 +28,10 @@ import {
 import {
   initAudioDevice, closeAudioDevice,
   loadSound, playSound, setSoundVolume,
-  loadMusic, playMusic, stopMusic, updateMusicStream, setMusicVolume, isMusicPlaying,
+  loadMusicRaw, playMusicRaw, stopMusicRaw, updateMusicStreamRaw, setMusicVolumeRaw,
 } from "bloom/audio";
 import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
-import { Rect, Texture, Sound, Music } from "bloom/core";
+import { Rect, Texture, Sound } from "bloom/core";
 
 // Direct FFI declaration — bypasses TypeScript wrapper object creation/property access overhead.
 // Each drawTexturePro via the wrapper creates 4 objects + 16 property lookups.
@@ -54,14 +54,23 @@ declare function bloom_draw_text(text: number, x: number, y: number, size: numbe
 // ============================================================
 
 // Platform detection — Perry-safe numeric checks
-// Platform: 0=unknown, 1=macos, 2=ios, 3=windows, 4=linux, 5=android, 6=tvos
-const PLATF = [0.0, 0.0, 0.0]; // [platform, isMobile, isTV]
+// Platform: 0=unknown, 1=macos, 2=ios, 3=windows, 4=linux, 5=android, 6=tvos, 7=web, 8=watchos
+const PLATF = [0.0, 0.0, 0.0, 0.0]; // [platform, isMobile, isTV, isWatch]
 PLATF[0] = getPlatform();
 if (PLATF[0] > 1.5 && PLATF[0] < 2.5) PLATF[1] = 1.0;  // iOS
 if (PLATF[0] > 4.5 && PLATF[0] < 5.5) PLATF[1] = 1.0;  // Android
 if (PLATF[0] > 5.5 && PLATF[0] < 6.5) PLATF[2] = 1.0;  // tvOS
+if (PLATF[0] > 7.5 && PLATF[0] < 8.5) PLATF[3] = 1.0;  // watchOS
 const MOBILE = PLATF[1];
 const TV = PLATF[2];
+const WATCH = PLATF[3];
+
+// Crown accumulator — smooths Digital Crown rotation into a [-1,1] horizontal
+// axis value used by the player-movement code. Crown deltas are radians since
+// last read; we scale, decay, and clamp.
+const CROWN = [0.0]; // [velocity ∈ [-1,1]]
+const CROWN_SCALE = 6.0;  // radians/sec → axis sensitivity
+const CROWN_DECAY = 0.80; // per-frame velocity decay when crown is still
 
 // ============================================================
 // TOUCH / GAMEPAD INPUT STATE (Perry-safe const arrays)
@@ -121,6 +130,9 @@ const ATLAS_UI_Y = 96.0;
 // UI scale state [uiScale] — updated each frame from screen size
 const UI = [1.0];
 const UI_SCALE = 0;
+
+// DEBUG counters: [tcSeen, outerLoop, xPassed, hitMatched]
+const DBG = [0.0, 0.0, 0.0, 0.0];
 const TILE_SRC = 16;   // sprite sheet tile size
 const TILE_SIZE = 32;   // display tile size (2x)
 const SCALE = 2.0;
@@ -223,6 +235,13 @@ const CAM = [400.0, 300.0, 1.0];
 
 // Game state [currentState, levelIndex, menuSelection, levelCount, flagReached, completeTimer, deathTimer]
 const GS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+// Separate debug counter array (Perry may not respect out-of-bounds appends)
+const GSDBG = [0.0, 0.0, 0.0, 0.0];
+const DBG_FRAME = 0;
+const DBG_TOUCH = 1;
+const DBG_LOOP = 2;
+const DBG_HIT = 3;
+const DBG_PROOF = [0.0];
 const GI_STATE = 0; const GI_LEVEL = 1; const GI_SEL = 2; const GI_LCOUNT = 3;
 const GI_FLAG = 4; const GI_CTIMER = 5; const GI_DTIMER = 6;
 
@@ -262,7 +281,7 @@ initAudioDevice();
 // Show loading screen
 beginDrawing();
 clearBackground(LOADING_BG);
-drawText("Loading...", getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, LOADING_TEXT);
+drawTextRgba("Loading...", getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, 200, 200, 220, 255);
 endDrawing();
 
 // Load single atlas texture (all sprites in one sheet = zero texture switches)
@@ -283,21 +302,22 @@ const sndGem = loadSound("assets/sounds/gem.wav");
 const sndComplete = loadSound("assets/sounds/complete.wav");
 const sndSelect = loadSound("assets/sounds/select.wav");
 
-// Load music
-const musMenu = loadMusic("assets/sounds/music_menu.wav");
-const musGame = loadMusic("assets/sounds/music_game.wav");
-setMusicVolume(musMenu, 0.5);
-setMusicVolume(musGame, 0.5);
+// Load music — raw number handles bypass Perry aarch64 NaN-box bug
+// where `music.handle` field reads corrupt FFI f64 args (same issue as Color fields)
+const musMenu = loadMusicRaw("assets/sounds/music_menu.wav");
+const musGame = loadMusicRaw("assets/sounds/music_game.wav");
+setMusicVolumeRaw(musMenu, 0.5);
+setMusicVolumeRaw(musGame, 0.5);
 
 // Music state: [currentTrack] — 0=none, 1=menu, 2=game
 const MUS = [0.0];
 
 function switchMusic(track: number): void {
-  if (MUS[0] > 0.5 && MUS[0] < 1.5) stopMusic(musMenu);
-  if (MUS[0] > 1.5 && MUS[0] < 2.5) stopMusic(musGame);
+  if (MUS[0] > 0.5 && MUS[0] < 1.5) stopMusicRaw(musMenu);
+  if (MUS[0] > 1.5 && MUS[0] < 2.5) stopMusicRaw(musGame);
   MUS[0] = track;
-  if (track > 0.5 && track < 1.5) playMusic(musMenu);
-  if (track > 1.5 && track < 2.5) playMusic(musGame);
+  if (track > 0.5 && track < 1.5) playMusicRaw(musMenu);
+  if (track > 1.5 && track < 2.5) playMusicRaw(musGame);
 }
 
 // Credits scroll state: [scrollY]
@@ -363,6 +383,26 @@ function updateTouchInput(sw: number, sh: number): void {
   TCH[TI_JUMP_DOWN] = 0.0;
   TCH[TI_JUMP_PRESSED] = 0.0;
   TCH[TI_PAUSE_PRESSED] = 0.0;
+
+  // watchOS: Digital Crown drives horizontal movement, any touch = jump.
+  if (WATCH > 0.5) {
+    const crownDelta = getCrownRotation();
+    // Accumulate crown velocity with decay so continuous rotation builds up
+    // to full axis deflection and stopping drops it back to zero smoothly.
+    let v = CROWN[0] * CROWN_DECAY + crownDelta * CROWN_SCALE;
+    if (v > 1.0) v = 1.0;
+    if (v < -1.0) v = -1.0;
+    CROWN[0] = v;
+    TCH[TI_JOY_X] = v;
+    TCH[TI_JOY_ACTIVE] = 1.0;
+    if (getTouchCount() > 0.5) {
+      TCH[TI_JUMP_DOWN] = 1.0;
+    }
+    if (TCH[TI_JUMP_DOWN] > 0.5 && TCH[TI_PREV_JUMP] < 0.5) {
+      TCH[TI_JUMP_PRESSED] = 1.0;
+    }
+    return;
+  }
 
   if (MOBILE < 0.5) return;
 
@@ -1285,7 +1325,7 @@ function drawCollectibles(t: number): void {
       // Gold ball on top
       bloom_draw_circle(fx + 16, fy - 124, 6, 255, 220, 50, 255);
       // "GOAL" text above
-      drawText("GOAL", fx - 2, fy - 148, 18, FLAG_TEXT);
+      drawTextRgba("GOAL", fx - 2, fy - 148, 18, 255, 255, 50, 255);
     }
   }
 }
@@ -1437,23 +1477,23 @@ function drawHUD(sw: number, sh: number): void {
   const coinX = floorf(130.0 * s);
   const coinIconSize = floorf(24.0 * s);
   bloom_draw_texture_pro(UI_TEX_ID, ATLAS_UI_X + 32.0, ATLAS_UI_Y, 16, 16, coinX, floorf(14.0 * s), coinIconSize, coinIconSize, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
-  drawText("x" + floorf(P[PI_COINS]).toString(), floorf(158.0 * s), floorf(16.0 * s), textSize, WHITE);
+  drawTextRgba("x" + floorf(P[PI_COINS]).toString(), floorf(158.0 * s), floorf(16.0 * s), textSize, 255, 255, 255, 255);
 
   // Gem count
   if (P[PI_GEMS] > 0.0) {
     drawItemSprite(4, floorf(220.0 * s), margin);
-    drawText("x" + floorf(P[PI_GEMS]).toString(), floorf(254.0 * s), floorf(16.0 * s), textSize, WHITE);
+    drawTextRgba("x" + floorf(P[PI_GEMS]).toString(), floorf(254.0 * s), floorf(16.0 * s), textSize, 255, 255, 255, 255);
   }
 
   // Lives
   const livesSize = floorf(20.0 * s);
-  drawText("Lives: " + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, WHITE);
+  drawTextRgba("Lives: " + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, 255, 255, 255, 255);
 
   // Perf debug bar
   const dbgSize = floorf(14.0 * s);
   const dbgY = sh - floorf(24.0 * s);
   bloom_draw_rect(0, dbgY - floorf(4.0 * s), sw, floorf(28.0 * s), 0, 0, 0, 220);
-  drawText("FPS:" + floorf(PERF[PF_FPS]).toString() + " dt:" + floorf(PERF[PF_LASTDT] * 1000.0).toString() + "ms drw:" + floorf(PERF[PF_DRAW] * 10.0).toString() + " sky:" + floorf(PERF[6]).toString() + " til:" + floorf(PERF[7]).toString() + " wld:" + floorf(PERF[8]).toString() + " hud:" + floorf(PERF[9]).toString(), floorf(8.0 * s), dbgY, dbgSize, { r: 255, g: 255, b: 0, a: 255 });
+  drawTextRgba("FPS:" + floorf(PERF[PF_FPS]).toString() + " dt:" + floorf(PERF[PF_LASTDT] * 1000.0).toString() + "ms drw:" + floorf(PERF[PF_DRAW] * 10.0).toString() + " sky:" + floorf(PERF[6]).toString() + " til:" + floorf(PERF[7]).toString() + " wld:" + floorf(PERF[8]).toString() + " hud:" + floorf(PERF[9]).toString(), floorf(8.0 * s), dbgY, dbgSize, { r: 255, g: 255, b: 0, a: 255 });
 }
 
 // ============================================================
@@ -1472,13 +1512,13 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
   const titleSize = floorf(60.0 * s);
   const titleText = "BLOOM JUMP";
   const titleW = measureText(titleText, titleSize);
-  drawText(titleText, floorf((sw - titleW) / 2.0), floorf(120.0 * s), titleSize, WHITE);
+  drawTextRgba(titleText, floorf((sw - titleW) / 2.0), floorf(120.0 * s), titleSize, 255, 255, 255, 255);
 
   // Subtitle
   const subSize = floorf(20.0 * s);
   const subText = "A Bloom Engine Platformer";
   const subW = measureText(subText, subSize);
-  drawText(subText, floorf((sw - subW) / 2.0), floorf(190.0 * s), subSize, { r: 220, g: 220, b: 255, a: 255 });
+  drawTextRgba(subText, floorf((sw - subW) / 2.0), floorf(190.0 * s), subSize, 220, 220, 255, 255);
 
   // Menu options
   const menuCount = 2;
@@ -1493,23 +1533,48 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
     if (i === selIdx) {
       const pulse = Math.sin(t * 4.0) * 0.3 + 0.7;
       const alpha = floorf(255.0 * pulse);
-      drawText("> " + label + " <", floorf(ox - 30.0 * s), oy, menuSize, { r: 255, g: 255, b: 100, a: alpha });
+      drawTextRgba("> " + label + " <", floorf(ox - 30.0 * s), oy, menuSize, 255, 255, 100, alpha);
     } else {
-      drawText(label, ox, oy, menuSize, { r: 200, g: 200, b: 220, a: 200 });
+      drawTextRgba(label, ox, oy, menuSize, 200, 200, 220, 200);
     }
+  }
+
+  // Debug: paint a giant background if updateTitleScreen ran even once
+  if (DBG_PROOF[0] > 0.5) {
+    bloom_draw_rect(0.0, 0.0, sw, 20.0, 0, 255, 0, 255);  // solid GREEN bar top of screen
+  }
+
+  // Debug: draw hit boxes on top of menu items to visualize alignment
+  if (MOBILE > 0.5) {
+    for (let mi = 0; mi < 2; mi = mi + 1) {
+      const itemY = floorf((300.0 + mi * 50.0) * s);
+      const boxH = floorf(40.0 * s) + 10.0;
+      bloom_draw_rect(floorf(sw * 0.1), itemY - 10.0, floorf(sw * 0.8), boxH, 255, 0, 0, 80);
+    }
+    const tc2 = getTouchCount();
+    for (let ti = 0; ti < tc2; ti = ti + 1) {
+      const tx = getTouchX(ti);
+      const ty = getTouchY(ti);
+      bloom_draw_rect(tx - 8.0, ty - 8.0, 16.0, 16.0, 0, 255, 0, 255);
+    }
+    // Debug counters using GSDBG[] (dedicated array): frame, touch, loop, hit
+    bloom_draw_rect(5.0, 5.0,  10.0 + GSDBG[DBG_FRAME] * 0.5, 15.0, 255, 255, 0, 255);  // frames updateTitleScreen ran
+    bloom_draw_rect(5.0, 25.0, 10.0 + GSDBG[DBG_TOUCH] * 8.0, 15.0, 255, 200, 0, 255);  // frames with touch
+    bloom_draw_rect(5.0, 45.0, 10.0 + GSDBG[DBG_LOOP]  * 8.0, 15.0, 255, 140, 0, 255);  // outer loop entered
+    bloom_draw_rect(5.0, 65.0, 10.0 + GSDBG[DBG_HIT]   * 8.0, 15.0, 255, 0,   0, 255);  // hit matched
   }
 
   // Instructions
   const instrSize = floorf(16.0 * s);
   if (MOBILE > 0.5) {
     const iw = measureText("Tap Play to begin", instrSize);
-    drawText("Tap Play to begin", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("Tap Play to begin", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
     const iw = measureText("Press A to select", instrSize);
-    drawText("Press A to select", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("Press A to select", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   } else {
     const iw = measureText("Arrow Keys / WASD to move, SPACE to jump", instrSize);
-    drawText("Arrow Keys / WASD to move, SPACE to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("Arrow Keys / WASD to move, SPACE to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   }
 
 }
@@ -1529,6 +1594,10 @@ function selectMenuItem(sw: number, sh: number): void {
 }
 
 function updateTitleScreen(sw: number, sh: number): void {
+  GSDBG[DBG_FRAME] = GSDBG[DBG_FRAME] + 1.0;
+  // SANITY: if this function runs at all, change background color via a module-level array
+  // that rendering will observe
+  DBG_PROOF[0] = DBG_PROOF[0] + 1.0;
   const menuMax = 1.0;
   // Keyboard / gamepad navigation
   if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S) || GP[GP_DOWN] > 0.5) {
@@ -1548,13 +1617,16 @@ function updateTitleScreen(sw: number, sh: number): void {
   if (MOBILE > 0.5) {
     const s = UI[UI_SCALE];
     const tc = getTouchCount();
-    for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
+    if (tc > 0.0) GSDBG[DBG_TOUCH] = GSDBG[DBG_TOUCH] + 1.0;
+    for (let ti = 0; ti < tc; ti = ti + 1) {
       const tx = getTouchX(ti);
       const ty = getTouchY(ti);
+      GSDBG[DBG_LOOP] = GSDBG[DBG_LOOP] + 1.0;
       if (tx > sw * 0.1 && tx < sw * 0.9) {
-        for (let mi = 0.0; mi < 2.0; mi = mi + 1.0) {
+        for (let mi = 0; mi < 2; mi = mi + 1) {
           const itemY = floorf((300.0 + mi * 50.0) * s);
           if (ty > itemY - 10.0 && ty < itemY + floorf(40.0 * s)) {
+            GSDBG[DBG_HIT] = GSDBG[DBG_HIT] + 1.0;
             GS[GI_SEL] = mi;
             selectMenuItem(sw, sh);
           }
@@ -1715,16 +1787,16 @@ function drawCreditsScreen(t: number, dt: number, sw: number, sh: number): void 
 
       if (lineType < 1.5) {
         // Heading — bright gold
-        drawText(text, tx, ty, fontSize, { r: 255, g: 220, b: 80, a: a });
+        drawTextRgba(text, tx, ty, fontSize, 255, 220, 80, a);
       } else if (lineType < 2.5) {
         // Subheading — soft cyan
-        drawText(text, tx, ty, fontSize, { r: 120, g: 220, b: 255, a: a });
+        drawTextRgba(text, tx, ty, fontSize, 120, 220, 255, a);
       } else if (lineType < 3.5) {
         // Body — white
-        drawText(text, tx, ty, fontSize, { r: 255, g: 255, b: 255, a: a });
+        drawTextRgba(text, tx, ty, fontSize, 255, 255, 255, a);
       } else {
         // Small — dim
-        drawText(text, tx, ty, fontSize, { r: 160, g: 160, b: 180, a: a });
+        drawTextRgba(text, tx, ty, fontSize, 160, 160, 180, a);
       }
     }
 
@@ -1753,7 +1825,7 @@ function drawCreditsScreen(t: number, dt: number, sw: number, sh: number): void 
   if (CRED[0] > totalH) dismiss = 1.0;
   if (isKeyPressed(Key.ESCAPE) || isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE)) dismiss = 1.0;
   if (GP[GP_CONFIRM] > 0.5 || GP[GP_PAUSE] > 0.5) dismiss = 1.0;
-  if (MOBILE > 0.5 && getTouchCount() > 0.0) dismiss = 1.0;
+  if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) dismiss = 1.0;
   if (dismiss > 0.5) {
     GS[GI_STATE] = ST_MENU;
     GS[GI_SEL] = 0.0;
@@ -1768,15 +1840,15 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
   const s = UI[UI_SCALE];
   const titleSize = floorf(36.0 * s);
   const tw = measureText("SELECT LEVEL", titleSize);
-  drawText("SELECT LEVEL", floorf((sw - tw) / 2.0), floorf(40.0 * s), titleSize, WHITE);
+  drawTextRgba("SELECT LEVEL", floorf((sw - tw) / 2.0), floorf(40.0 * s), titleSize, 255, 255, 255, 255);
 
   const count = floorf(GS[GI_LCOUNT]);
   const itemSize = floorf(24.0 * s);
   const rowH = floorf(40.0 * s);
   if (count < 1) {
     const emptySize = floorf(20.0 * s);
-    drawText("No levels found in assets/levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
-    drawText("Run the editor to create levels!", floorf(170.0 * s), floorf(290.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
+    drawTextRgba("No levels found in assets/levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
+    drawTextRgba("Run the editor to create levels!", floorf(170.0 * s), floorf(290.0 * s), emptySize, 200, 200, 200, 200);
   }
 
   const selIdx = floorf(GS[GI_SEL]);
@@ -1788,22 +1860,22 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
 
     if (i === selIdx) {
       bloom_draw_rect(floorf(80.0 * s), oy - floorf(4.0 * s), sw - floorf(160.0 * s), floorf(36.0 * s), 255, 255, 255, 30);
-      drawText("> " + name, floorf(100.0 * s), oy, itemSize, { r: 255, g: 255, b: 100, a: 255 });
+      drawTextRgba("> " + name, floorf(100.0 * s), oy, itemSize, 255, 255, 100, 255);
     } else {
-      drawText(name, floorf(120.0 * s), oy, itemSize, { r: 200, g: 200, b: 220, a: 200 });
+      drawTextRgba(name, floorf(120.0 * s), oy, itemSize, 200, 200, 220, 200);
     }
   }
 
   const instrSize = floorf(18.0 * s);
   if (MOBILE > 0.5) {
     const iw = measureText("Tap a level to play", instrSize);
-    drawText("Tap a level to play", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("Tap a level to play", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
     const iw = measureText("A to play, Menu to go back", instrSize);
-    drawText("A to play, Menu to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("A to play, Menu to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   } else {
     const iw = measureText("ENTER to play, ESC to go back", instrSize);
-    drawText("ENTER to play, ESC to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("ENTER to play, ESC to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   }
 }
 
@@ -1858,27 +1930,27 @@ function drawPauseScreen(sw: number, sh: number): void {
   const pauseSize = floorf(48.0 * s);
   const text = "PAUSED";
   const tw = measureText(text, pauseSize);
-  drawText(text, floorf((sw - tw) / 2.0), floorf(220.0 * s), pauseSize, WHITE);
+  drawTextRgba(text, floorf((sw - tw) / 2.0), floorf(220.0 * s), pauseSize, 255, 255, 255, 255);
 
   const btnSize = floorf(28.0 * s);
   const resumeLabel = "Resume";
   const resumeW = measureText(resumeLabel, btnSize);
-  drawText(resumeLabel, floorf((sw - resumeW) / 2.0), floorf(290.0 * s), btnSize, { r: 200, g: 200, b: 220, a: 200 });
+  drawTextRgba(resumeLabel, floorf((sw - resumeW) / 2.0), floorf(290.0 * s), btnSize, 200, 200, 220, 200);
 
   const quitLabel = "Quit to Menu";
   const quitW = measureText(quitLabel, btnSize);
-  drawText(quitLabel, floorf((sw - quitW) / 2.0), floorf(340.0 * s), btnSize, { r: 200, g: 200, b: 220, a: 200 });
+  drawTextRgba(quitLabel, floorf((sw - quitW) / 2.0), floorf(340.0 * s), btnSize, 200, 200, 220, 200);
 
   const instrSize = floorf(16.0 * s);
   if (MOBILE > 0.5) {
     const iw = measureText("Tap to Resume or Quit", instrSize);
-    drawText("Tap to Resume or Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("Tap to Resume or Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
     const iw = measureText("A to Resume, Menu to Quit", instrSize);
-    drawText("A to Resume, Menu to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("A to Resume, Menu to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
   } else {
     const iw = measureText("ESC to Resume, Q to Quit", instrSize);
-    drawText("ESC to Resume, Q to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, { r: 180, g: 180, b: 200, a: 180 });
+    drawTextRgba("ESC to Resume, Q to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
   }
 }
 
@@ -1889,23 +1961,23 @@ function drawGameOver(sw: number, sh: number): void {
   const headSize = floorf(48.0 * s);
   const text = "GAME OVER";
   const tw = measureText(text, headSize);
-  drawText(text, floorf((sw - tw) / 2.0), floorf(200.0 * s), headSize, { r: 230, g: 60, b: 60, a: 255 });
+  drawTextRgba(text, floorf((sw - tw) / 2.0), floorf(200.0 * s), headSize, 230, 60, 60, 255);
 
   const bodySize = floorf(24.0 * s);
   const coinsText = "Coins: " + floorf(P[PI_COINS]).toString();
   const cw = measureText(coinsText, bodySize);
-  drawText(coinsText, floorf((sw - cw) / 2.0), floorf(280.0 * s), bodySize, WHITE);
+  drawTextRgba(coinsText, floorf((sw - cw) / 2.0), floorf(280.0 * s), bodySize, 255, 255, 255, 255);
 
   const instrSize = floorf(20.0 * s);
   if (MOBILE > 0.5) {
     const iw = measureText("Tap to continue", instrSize);
-    drawText("Tap to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Tap to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
   } else if (TV > 0.5) {
     const iw = measureText("Press A to continue", instrSize);
-    drawText("Press A to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Press A to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
   } else {
     const iw = measureText("Press ENTER to continue", instrSize);
-    drawText("Press ENTER to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Press ENTER to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
   }
 }
 
@@ -1915,28 +1987,28 @@ function drawLevelCompleteScreen(t: number, sw: number, sh: number): void {
   const headSize = floorf(42.0 * s);
   const text = "LEVEL COMPLETE!";
   const tw = measureText(text, headSize);
-  drawText(text, floorf((sw - tw) / 2.0), floorf(180.0 * s), headSize, { r: 255, g: 255, b: 100, a: 255 });
+  drawTextRgba(text, floorf((sw - tw) / 2.0), floorf(180.0 * s), headSize, 255, 255, 100, 255);
 
   const bodySize = floorf(24.0 * s);
   const coinsText = "Coins: " + floorf(P[PI_COINS]).toString();
   const cw = measureText(coinsText, bodySize);
-  drawText(coinsText, floorf((sw - cw) / 2.0), floorf(260.0 * s), bodySize, WHITE);
+  drawTextRgba(coinsText, floorf((sw - cw) / 2.0), floorf(260.0 * s), bodySize, 255, 255, 255, 255);
 
   if (P[PI_GEMS] > 0.0) {
     const gemText = "Gems: " + floorf(P[PI_GEMS]).toString();
     const gw = measureText(gemText, bodySize);
-    drawText(gemText, floorf((sw - gw) / 2.0), floorf(300.0 * s), bodySize, { r: 50, g: 150, b: 255, a: 255 });
+    drawTextRgba(gemText, floorf((sw - gw) / 2.0), floorf(300.0 * s), bodySize, 50, 150, 255, 255);
   }
 
   const instrSize = floorf(20.0 * s);
   if (MOBILE > 0.5) {
     const iw = measureText("Tap to continue", instrSize);
-    drawText("Tap to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Tap to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, 200, 200, 220, 200);
   } else if (TV > 0.5) {
     const iw = measureText("Press A to continue", instrSize);
-    drawText("Press A to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Press A to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, 200, 200, 220, 200);
   } else {
-    drawText("Press ENTER to continue", floorf(sw / 2.0) - 120, 380, 20, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Press ENTER to continue", floorf(sw / 2.0) - 120, 380, 20, 200, 200, 220, 200);
   }
 }
 
@@ -1966,7 +2038,7 @@ function drawTouchControls(sw: number, sh: number): void {
   if (TCH[TI_JUMP_DOWN] > 0.5) jumpAlpha = 80;
   bloom_draw_circle(jumpX, jumpY, jumpR, 255, 255, 255, jumpAlpha);
   const jumpLabelSize = floorf(16.0 * s);
-  drawText("Jump", jumpX - floorf(20.0 * s), jumpY - floorf(8.0 * s), jumpLabelSize, { r: 255, g: 255, b: 255, a: 150 });
+  drawTextRgba("Jump", jumpX - floorf(20.0 * s), jumpY - floorf(8.0 * s), jumpLabelSize, 255, 255, 255, 150);
 
   // Pause button (top-right)
   const pauseS = floorf(TOUCH_PAUSE_SIZE * s * 0.75);
@@ -2018,8 +2090,8 @@ while (!windowShouldClose()) {
   UI[UI_SCALE] = shortDim / DESIGN_H;
 
   // Update music stream (must be called every frame)
-  if (MUS[0] > 0.5 && MUS[0] < 1.5) updateMusicStream(musMenu);
-  if (MUS[0] > 1.5 && MUS[0] < 2.5) updateMusicStream(musGame);
+  if (MUS[0] > 0.5 && MUS[0] < 1.5) updateMusicStreamRaw(musMenu);
+  if (MUS[0] > 1.5 && MUS[0] < 2.5) updateMusicStreamRaw(musGame);
 
   // Process platform input
   updateTouchInput(sw, sh);
@@ -2134,7 +2206,7 @@ while (!windowShouldClose()) {
     // === GAME OVER ===
     drawGameOver(sw, sh);
     let goAnyTap = 0.0;
-    if (MOBILE > 0.5 && getTouchCount() > 0.0) goAnyTap = 1.0;
+    if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) goAnyTap = 1.0;
     if (isKeyPressed(Key.ENTER) || goAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL];
@@ -2159,7 +2231,7 @@ while (!windowShouldClose()) {
     drawLevelCompleteScreen(t, sw, sh);
 
     let lcAnyTap = 0.0;
-    if (MOBILE > 0.5 && getTouchCount() > 0.0) lcAnyTap = 1.0;
+    if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) lcAnyTap = 1.0;
     if (isKeyPressed(Key.ENTER) || lcAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL] + 1.0;
