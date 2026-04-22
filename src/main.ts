@@ -4,34 +4,30 @@
 // ============================================================
 
 import {
-  initWindow, windowShouldClose, beginDrawing, endDrawing,
-  clearBackground, setTargetFPS, getDeltaTime, getTime,
+  initWindow, windowShouldClose, beginDrawing, endDrawing, runGame,
+  clearBackground, setTargetFPS, setDirect2DMode, getDeltaTime, getTime,
   isKeyPressed, isKeyDown, isKeyReleased,
   getMouseX, getMouseY, isMouseButtonPressed,
   getScreenWidth, getScreenHeight, closeWindow,
-  beginMode2D, endMode2D, getScreenToWorld2D,
+  beginMode2DRaw, endMode2D, getScreenToWorld2D,
   writeFile, readFile, fileExists,
   isMobile, isTV, isWatch, getPlatform, getCrownRotation,
   getTouchX, getTouchY, getTouchCount,
   isGamepadAvailable, getGamepadAxis, isGamepadButtonPressed, isGamepadButtonDown,
 } from "bloom/core";
-import { Color, Key, Camera2D, MouseButton } from "bloom/core";
+import { Color, Key, MouseButton } from "bloom/core";
 import {
   drawRect, drawCircle, drawTriangle, drawLine, drawRectLines,
-  checkCollisionRecs,
 } from "bloom/shapes";
 import { drawTextRgba, measureText } from "bloom/text";
-import {
-  loadTexture, drawTexturePro, drawTextureRec,
-  setTextureFilter, FILTER_NEAREST,
-} from "bloom/textures";
+import { FILTER_NEAREST } from "bloom/textures";
 import {
   initAudioDevice, closeAudioDevice,
   loadSound, playSound, setSoundVolume,
   loadMusicRaw, playMusicRaw, stopMusicRaw, updateMusicStreamRaw, setMusicVolumeRaw,
 } from "bloom/audio";
 import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
-import { Rect, Texture, Sound } from "bloom/core";
+import { Texture, Sound } from "bloom/core";
 
 // Direct FFI declaration — bypasses TypeScript wrapper object creation/property access overhead.
 // Each drawTexturePro via the wrapper creates 4 objects + 16 property lookups.
@@ -42,6 +38,8 @@ declare function bloom_draw_texture_pro(
   ox: number, oy: number, rot: number,
   r: number, g: number, b: number, a: number
 ): void;
+declare function bloom_load_texture(path: number): number;
+declare function bloom_set_texture_filter(handle: number, mode: number): void;
 declare function bloom_draw_rect(x: number, y: number, w: number, h: number, r: number, g: number, b: number, a: number): void;
 declare function bloom_draw_rect_lines(x: number, y: number, w: number, h: number, thickness: number, r: number, g: number, b: number, a: number): void;
 declare function bloom_draw_circle(cx: number, cy: number, radius: number, r: number, g: number, b: number, a: number): void;
@@ -250,9 +248,22 @@ const TILES: number[] = [];
 const LVL = [0.0, 0.0, 0.0, 0.0]; // [width, height, spawnX, spawnY]
 const FLAG_POS = [0.0, 0.0, 0.0]; // [x_pixels, y_pixels, active]
 
-// Pre-allocated rects for collision checks (avoid per-frame allocation)
-const PRECT: Rect = { x: 0.0, y: 0.0, width: PW, height: PH };
-const ERECT: Rect = { x: 0.0, y: 0.0, width: 0.0, height: 0.0 };
+// Flat rect storage for collision checks. Perry 0.5.x miscompiles numeric
+// obj.field reads on aarch64 Android (PerryTS/perry#128), so
+// checkCollisionRecs with Rect objects silently returns false there —
+// breaking coin collection, enemy stomp, and hurt detection. Arrays
+// indexed by constants dodge the codegen bug.
+// Layout: [x, y, w, h]
+const PRECT = [0.0, 0.0, PW, PH];
+const ERECT = [0.0, 0.0, 0.0, 0.0];
+const R_X = 0; const R_Y = 1; const R_W = 2; const R_H = 3;
+
+function aabbOverlap(
+  ax: number, ay: number, aw: number, ah: number,
+  bx: number, by: number, bw: number, bh: number,
+): boolean {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
 
 // Enemy pool (parallel arrays)
 const EX: number[] = []; const EY: number[] = []; const EVX: number[] = []; const EVY: number[] = [];
@@ -275,6 +286,10 @@ const LEVEL_FILES: string[] = [];
 
 initWindow(SCREEN_W, SCREEN_H, "Bloom Jump", false);
 setTargetFPS(60);
+// Pure-2D game — take the direct-to-swapchain path in the engine and
+// skip the deferred 3D pipeline entirely. On Android Adreno 618 this is
+// the difference between ~15 fps and 60 fps.
+setDirect2DMode(true);
 initAudioDevice();
 
 
@@ -284,11 +299,12 @@ clearBackground(LOADING_BG);
 drawTextRgba("Loading...", getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, 200, 200, 220, 255);
 endDrawing();
 
-// Load single atlas texture (all sprites in one sheet = zero texture switches)
-const texAtlas = loadTexture("assets/sprites/atlas.png");
-setTextureFilter(texAtlas, FILTER_NEAREST);
-// Cache texture ID to avoid repeated string-based property lookup on texAtlas.id
-const ATLAS_ID = texAtlas.id;
+// Load single atlas texture (all sprites in one sheet = zero texture switches).
+// Bypass the Texture wrapper: on aarch64 Android, Perry miscompiles obj.field
+// reads — `loadTexture(...).id` gives NaN and every subsequent draw is skipped.
+// Calling bloom_load_texture directly keeps ATLAS_ID as a raw number.
+const ATLAS_ID = bloom_load_texture("assets/sprites/atlas.png" as any);
+bloom_set_texture_filter(ATLAS_ID, FILTER_NEAREST);
 const UI_TEX_ID = ATLAS_ID; // same atlas
 
 // Load sounds
@@ -1221,10 +1237,10 @@ function updateEnemies(dt: number): void {
     // Player collision with enemy
     if (P[PI_DEAD] > 0.5 || P[PI_INV] > 0.0) continue;
 
-    PRECT.x = P[PI_X] + POX; PRECT.y = P[PI_Y] + POY;
-    ERECT.x = EX[i] + 4.0; ERECT.y = EY[i] + 4.0; ERECT.width = TILE_SIZE - 8.0; ERECT.height = TILE_SIZE - 8.0;
+    PRECT[R_X] = P[PI_X] + POX; PRECT[R_Y] = P[PI_Y] + POY;
+    ERECT[R_X] = EX[i] + 4.0; ERECT[R_Y] = EY[i] + 4.0; ERECT[R_W] = TILE_SIZE - 8.0; ERECT[R_H] = TILE_SIZE - 8.0;
 
-    if (checkCollisionRecs(PRECT, ERECT)) {
+    if (aabbOverlap(PRECT[R_X], PRECT[R_Y], PRECT[R_W], PRECT[R_H], ERECT[R_X], ERECT[R_Y], ERECT[R_W], ERECT[R_H])) {
       // Check if stomping (player falling and above enemy)
       if (P[PI_VY] > 0.0 && P[PI_PBOTY] < EY[i] + 12.0 && type < 3.5) {
         // Stomp! (flyers can't be stomped: type === E_FLYER check)
@@ -1262,15 +1278,15 @@ function drawEnemies(t: number): void {
 function updateCollectibles(dt: number, t: number): void {
   if (P[PI_DEAD] > 0.5 || GS[GI_FLAG] > 0.5) return;
 
-  PRECT.x = P[PI_X] + POX; PRECT.y = P[PI_Y] + POY;
+  PRECT[R_X] = P[PI_X] + POX; PRECT[R_Y] = P[PI_Y] + POY;
 
   for (let i = 0; i < MAX_COINS; i = i + 1) {
     if (CA[i] < 0.5) continue;
     const type = CT[i];
 
-    ERECT.x = CX[i] + 6.0; ERECT.y = CY[i] + 6.0; ERECT.width = 20.0; ERECT.height = 20.0;
+    ERECT[R_X] = CX[i] + 6.0; ERECT[R_Y] = CY[i] + 6.0; ERECT[R_W] = 20.0; ERECT[R_H] = 20.0;
 
-    if (checkCollisionRecs(PRECT, ERECT)) {
+    if (aabbOverlap(PRECT[R_X], PRECT[R_Y], PRECT[R_W], PRECT[R_H], ERECT[R_X], ERECT[R_Y], ERECT[R_W], ERECT[R_H])) {
       if (type > 9.5 && type < 10.5) {
         // Coin
         CA[i] = 0.0;
@@ -2068,13 +2084,6 @@ function drawTouchControls(sw: number, sh: number): void {
 // MAIN GAME LOOP
 // ============================================================
 
-const camera: Camera2D = {
-  offset: { x: 400.0, y: 300.0 },
-  target: { x: 0.0, y: 0.0 },
-  rotation: 0.0,
-  zoom: 1.0,
-};
-
 // Start at title screen
 GS[GI_STATE] = ST_MENU;
 switchMusic(1.0);
@@ -2086,16 +2095,16 @@ const PF_COUNT = 0; const PF_TIMER = 1; const PF_FPS = 2;
 const PF_UPDATE = 3; const PF_DRAW = 4; const PF_PRESENT = 5;
 const PF_LASTDT = 6; const PF_DTACC = 7;
 
-while (!windowShouldClose()) {
-  const dt = getDeltaTime();
+// runGame dispatches per platform: rAF-driven on web (bloom_run_game hook),
+// blocking while-loop on native. The callback receives dt; beginDrawing/
+// endDrawing are done by runGame itself, so we don't call them in here.
+runGame((dt: number): void => {
   const t = getTime();
   const frameStart = getTime();
 
   // Dynamic screen size (mobile fills device screen, desktop uses SCREEN_W/SCREEN_H)
   const sw = getScreenWidth();
   const sh = getScreenHeight();
-  camera.offset.x = sw / 2.0;
-  camera.offset.y = sh / 2.0;
 
   // UI scale: scale all text/positions relative to design height
   // In landscape sh is shorter dim, in portrait sw is shorter
@@ -2109,8 +2118,6 @@ while (!windowShouldClose()) {
   // Process platform input
   updateTouchInput(sw, sh);
   updateGamepadInput();
-
-  beginDrawing();
 
   const state = floorf(GS[GI_STATE]);
 
@@ -2139,11 +2146,6 @@ while (!windowShouldClose()) {
     const tUpdate1 = getTime();
     PERF[PF_UPDATE] = (tUpdate1 - tUpdate0) * 1000.0;
 
-    // Update camera struct
-    camera.target.x = floorf(CAM[0]);
-    camera.target.y = floorf(CAM[1]);
-    camera.zoom = CAM[2];
-
     // Draw
     const tDraw0 = getTime();
 
@@ -2151,7 +2153,7 @@ while (!windowShouldClose()) {
     drawParallaxBg(sw, sh);
     const tSky = getTime();
 
-    beginMode2D(camera);
+    beginMode2DRaw(sw * 0.5, sh * 0.5, floorf(CAM[0]), floorf(CAM[1]), 0.0, CAM[2]);
     drawVisibleTiles(sw, sh);
     const tTiles = getTime();
     drawCollectibles(t);
@@ -2179,12 +2181,9 @@ while (!windowShouldClose()) {
   } else if (state === ST_PAUSED) {
     // === PAUSED ===
     // Draw game underneath
-    camera.target.x = floorf(CAM[0]);
-    camera.target.y = floorf(CAM[1]);
-    camera.zoom = CAM[2];
     drawSkyGradient(sw, sh);
     drawParallaxBg(sw, sh);
-    beginMode2D(camera);
+    beginMode2DRaw(sw * 0.5, sh * 0.5, floorf(CAM[0]), floorf(CAM[1]), 0.0, CAM[2]);
     drawVisibleTiles(sw, sh);
     drawCollectibles(t);
     drawEnemies(t);
@@ -2230,12 +2229,9 @@ while (!windowShouldClose()) {
   } else if (state === ST_LEVEL_COMPLETE) {
     // === LEVEL COMPLETE ===
     // Draw game underneath
-    camera.target.x = floorf(CAM[0]);
-    camera.target.y = floorf(CAM[1]);
-    camera.zoom = CAM[2];
     drawSkyGradient(sw, sh);
     drawParallaxBg(sw, sh);
-    beginMode2D(camera);
+    beginMode2DRaw(sw * 0.5, sh * 0.5, floorf(CAM[0]), floorf(CAM[1]), 0.0, CAM[2]);
     drawVisibleTiles(sw, sh);
     drawCollectibles(t);
     drawPlayerCharacter(t);
@@ -2253,11 +2249,6 @@ while (!windowShouldClose()) {
     }
   }
 
-  const tPresent0 = getTime();
-  endDrawing();
-  const tPresent1 = getTime();
-  PERF[PF_PRESENT] = (tPresent1 - tPresent0) * 1000.0;
-
   // FPS counter
   PERF[PF_LASTDT] = dt;
   PERF[PF_COUNT] = PERF[PF_COUNT] + 1.0;
@@ -2267,7 +2258,7 @@ while (!windowShouldClose()) {
     PERF[PF_COUNT] = 0.0;
     PERF[PF_DTACC] = 0.0;
   }
-}
+});
 
 closeAudioDevice();
 closeWindow();

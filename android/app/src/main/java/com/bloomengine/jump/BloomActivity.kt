@@ -31,6 +31,7 @@ class BloomActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         // Fullscreen immersive
+        @Suppress("DEPRECATION")
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -46,6 +47,26 @@ class BloomActivity : Activity() {
         System.loadLibrary("bloom_jump")
 
         surfaceView = SurfaceView(this)
+        surfaceView.isFocusable = true
+        surfaceView.isFocusableInTouchMode = true
+        surfaceView.setOnTouchListener { _, event ->
+            if (!surfaceReady) return@setOnTouchListener false
+            val pointerIndex = event.actionIndex
+            val action = when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> 0
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> 1
+                MotionEvent.ACTION_MOVE -> 2
+                else -> return@setOnTouchListener false
+            }
+            if (action == 2) {
+                for (i in 0 until event.pointerCount) {
+                    BloomGameBridge.nativeOnTouch(action, event.getX(i).toDouble(), event.getY(i).toDouble(), i)
+                }
+            } else {
+                BloomGameBridge.nativeOnTouch(action, event.getX(pointerIndex).toDouble(), event.getY(pointerIndex).toDouble(), pointerIndex)
+            }
+            true
+        }
         setContentView(surfaceView)
 
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
@@ -87,7 +108,6 @@ class BloomActivity : Activity() {
         }
 
         if (action == 2) {
-            // For MOVE events, report all active pointers
             for (i in 0 until event.pointerCount) {
                 BloomGameBridge.nativeOnTouch(action, event.getX(i).toDouble(), event.getY(i).toDouble(), i)
             }

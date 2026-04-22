@@ -14,7 +14,7 @@
         android:hardwareAccelerated="true">
 
         <activity
-            android:name=".BloomActivity"
+            android:name="com.bloomengine.jump.BloomActivity"
             android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"

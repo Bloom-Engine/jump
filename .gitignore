@@ -1,8 +1,8 @@
 node_modules/
 target/
-jump
+/jump
 .env
-editor
+/editor
 *.o
 *.so
 _perry_stubs.o

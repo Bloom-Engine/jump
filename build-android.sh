@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR"
 
 # ── NDK / SDK environment ────────────────────
 export ANDROID_HOME=/Users/amlug/Library/Android/sdk
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.0.12433566"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.14904198"
 NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
 
 export CC_aarch64_linux_android="$NDK_BIN/aarch64-linux-android24-clang"
@@ -47,7 +47,7 @@ JNILIBS_DIR="android/app/src/main/jniLibs/arm64-v8a"
 ASSETS_SRC="assets"
 ASSETS_DST="android/app/src/main/assets/assets"
 PACKAGE="com.bloom.jump"
-ACTIVITY=".BloomActivity"
+ACTIVITY="com.bloomengine.jump.BloomActivity"
 
 # ── Step 1: Compile with Perry ───────────────
 echo "==> Compiling with Perry (target: android)..."
