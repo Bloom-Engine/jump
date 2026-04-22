@@ -73,9 +73,10 @@ const WATCH = PLATF[3];
 // Crown accumulator — smooths Digital Crown rotation into a [-1,1] horizontal
 // axis value used by the player-movement code. Crown deltas are radians since
 // last read; we scale, decay, and clamp.
-const CROWN = [0.0]; // [velocity ∈ [-1,1]]
+const CROWN = [0.0, 0.0]; // [velocity ∈ [-1,1], menuAccum in radians]
 const CROWN_SCALE = 6.0;  // radians/sec → axis sensitivity
 const CROWN_DECAY = 0.80; // per-frame velocity decay when crown is still
+const CROWN_MENU_STEP = 0.35; // rad of rotation per menu selection nudge
 
 // ============================================================
 // TOUCH / GAMEPAD INPUT STATE (Perry-safe const arrays)
@@ -240,13 +241,6 @@ const CAM = [400.0, 300.0, 1.0];
 
 // Game state [currentState, levelIndex, menuSelection, levelCount, flagReached, completeTimer, deathTimer]
 const GS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-// Separate debug counter array (Perry may not respect out-of-bounds appends)
-const GSDBG = [0.0, 0.0, 0.0, 0.0];
-const DBG_FRAME = 0;
-const DBG_TOUCH = 1;
-const DBG_LOOP = 2;
-const DBG_HIT = 3;
-const DBG_PROOF = [0.0];
 const GI_STATE = 0; const GI_LEVEL = 1; const GI_SEL = 2; const GI_LCOUNT = 3;
 const GI_FLAG = 4; const GI_CTIMER = 5; const GI_DTIMER = 6;
 
@@ -418,6 +412,14 @@ function updateTouchInput(sw: number, sh: number): void {
     CROWN[0] = v;
     TCH[TI_JOY_X] = v;
     TCH[TI_JOY_ACTIVE] = 1.0;
+    // Accumulate raw crown rotation for menu navigation. Reset during gameplay
+    // so the accumulator can't snowball while the player is steering.
+    const stNow = floorf(GS[GI_STATE]);
+    if (stNow === floorf(ST_PLAYING)) {
+      CROWN[1] = 0.0;
+    } else {
+      CROWN[1] = CROWN[1] + crownDelta;
+    }
     if (getTouchCount() > 0.5) {
       TCH[TI_JUMP_DOWN] = 1.0;
     }
@@ -484,6 +486,21 @@ function updateTouchInput(sw: number, sh: number): void {
   if (TCH[TI_JUMP_DOWN] > 0.5 && TCH[TI_PREV_JUMP] < 0.5) {
     TCH[TI_JUMP_PRESSED] = 1.0;
   }
+}
+
+// Returns +1 / -1 when the crown has been rotated far enough to nudge a menu,
+// 0 otherwise. Consumes the accumulator on a step so each threshold crossing
+// advances exactly once.
+function consumeCrownStep(): number {
+  if (CROWN[1] > CROWN_MENU_STEP) {
+    CROWN[1] = 0.0;
+    return 1.0;
+  }
+  if (CROWN[1] < 0.0 - CROWN_MENU_STEP) {
+    CROWN[1] = 0.0;
+    return 0.0 - 1.0;
+  }
+  return 0.0;
 }
 
 function updateGamepadInput(): void {
@@ -1525,12 +1542,6 @@ function drawHUD(sw: number, sh: number): void {
   // Lives
   const livesSize = floorf(20.0 * s);
   drawTextRgba("Lives: " + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, 255, 255, 255, 255);
-
-  // Perf debug bar
-  const dbgSize = floorf(14.0 * s);
-  const dbgY = sh - floorf(24.0 * s);
-  bloom_draw_rect(0, dbgY - floorf(4.0 * s), sw, floorf(28.0 * s), 0, 0, 0, 220);
-  drawTextRgba("FPS:" + floorf(PERF[PF_FPS]).toString() + " dt:" + floorf(PERF[PF_LASTDT] * 1000.0).toString() + "ms drw:" + floorf(PERF[PF_DRAW] * 10.0).toString() + " sky:" + floorf(PERF[6]).toString() + " til:" + floorf(PERF[7]).toString() + " wld:" + floorf(PERF[8]).toString() + " hud:" + floorf(PERF[9]).toString(), floorf(8.0 * s), dbgY, dbgSize, { r: 255, g: 255, b: 0, a: 255 });
 }
 
 // ============================================================
@@ -1576,31 +1587,6 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
     }
   }
 
-  // Debug: paint a giant background if updateTitleScreen ran even once
-  if (DBG_PROOF[0] > 0.5) {
-    bloom_draw_rect(0.0, 0.0, sw, 20.0, 0, 255, 0, 255);  // solid GREEN bar top of screen
-  }
-
-  // Debug: draw hit boxes on top of menu items to visualize alignment
-  if (MOBILE > 0.5) {
-    for (let mi = 0; mi < 2; mi = mi + 1) {
-      const itemY = floorf((300.0 + mi * 50.0) * s);
-      const boxH = floorf(40.0 * s) + 10.0;
-      bloom_draw_rect(floorf(sw * 0.1), itemY - 10.0, floorf(sw * 0.8), boxH, 255, 0, 0, 80);
-    }
-    const tc2 = getTouchCount();
-    for (let ti = 0; ti < tc2; ti = ti + 1) {
-      const tx = getTouchX(ti);
-      const ty = getTouchY(ti);
-      bloom_draw_rect(tx - 8.0, ty - 8.0, 16.0, 16.0, 0, 255, 0, 255);
-    }
-    // Debug counters using GSDBG[] (dedicated array): frame, touch, loop, hit
-    bloom_draw_rect(5.0, 5.0,  10.0 + GSDBG[DBG_FRAME] * 0.5, 15.0, 255, 255, 0, 255);  // frames updateTitleScreen ran
-    bloom_draw_rect(5.0, 25.0, 10.0 + GSDBG[DBG_TOUCH] * 8.0, 15.0, 255, 200, 0, 255);  // frames with touch
-    bloom_draw_rect(5.0, 45.0, 10.0 + GSDBG[DBG_LOOP]  * 8.0, 15.0, 255, 140, 0, 255);  // outer loop entered
-    bloom_draw_rect(5.0, 65.0, 10.0 + GSDBG[DBG_HIT]   * 8.0, 15.0, 255, 0,   0, 255);  // hit matched
-  }
-
   // Instructions
   const instrSize = floorf(16.0 * s);
   if (WATCH > 0.5) {
@@ -1634,10 +1620,6 @@ function selectMenuItem(sw: number, sh: number): void {
 }
 
 function updateTitleScreen(sw: number, sh: number): void {
-  GSDBG[DBG_FRAME] = GSDBG[DBG_FRAME] + 1.0;
-  // SANITY: if this function runs at all, change background color via a module-level array
-  // that rendering will observe
-  DBG_PROOF[0] = DBG_PROOF[0] + 1.0;
   const menuMax = 1.0;
   // Keyboard / gamepad navigation
   if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || GP[GP_DOWN] > 0.5) {
@@ -1653,20 +1635,33 @@ function updateTitleScreen(sw: number, sh: number): void {
   if (isKeyPressed(265) || isKeyPressed(32) || GP[GP_CONFIRM] > 0.5) {
     selectMenuItem(sw, sh);
   }
+  // Watch: crown scrolls the selection, a tap on the face confirms.
+  if (WATCH > 0.5) {
+    const step = consumeCrownStep();
+    if (step > 0.5) {
+      GS[GI_SEL] = GS[GI_SEL] + 1.0;
+      if (GS[GI_SEL] > menuMax) GS[GI_SEL] = 0.0;
+      playSound(sndSelect);
+    } else if (step < 0.0 - 0.5) {
+      GS[GI_SEL] = GS[GI_SEL] - 1.0;
+      if (GS[GI_SEL] < 0.0) GS[GI_SEL] = menuMax;
+      playSound(sndSelect);
+    }
+    if (TCH[TI_JUMP_PRESSED] > 0.5) {
+      selectMenuItem(sw, sh);
+    }
+  }
   // Touch: tap on menu items
   if (MOBILE > 0.5) {
     const s = UI[UI_SCALE];
     const tc = getTouchCount();
-    if (tc > 0.0) GSDBG[DBG_TOUCH] = GSDBG[DBG_TOUCH] + 1.0;
     for (let ti = 0; ti < tc; ti = ti + 1) {
       const tx = getTouchX(ti);
       const ty = getTouchY(ti);
-      GSDBG[DBG_LOOP] = GSDBG[DBG_LOOP] + 1.0;
       if (tx > sw * 0.1 && tx < sw * 0.9) {
         for (let mi = 0; mi < 2; mi = mi + 1) {
           const itemY = floorf((300.0 + mi * 50.0) * s);
           if (ty > itemY - 10.0 && ty < itemY + floorf(40.0 * s)) {
-            GSDBG[DBG_HIT] = GSDBG[DBG_HIT] + 1.0;
             GS[GI_SEL] = mi;
             selectMenuItem(sw, sh);
           }
@@ -1944,6 +1939,25 @@ function updateLevelSelect(sw: number, sh: number): void {
     GS[GI_STATE] = ST_MENU;
     GS[GI_SEL] = 0.0;
   }
+  // Watch: crown scrolls the level list, a tap confirms the highlight.
+  if (WATCH > 0.5) {
+    const step = consumeCrownStep();
+    if (step > 0.5) {
+      GS[GI_SEL] = GS[GI_SEL] + 1.0;
+      if (GS[GI_SEL] >= count) GS[GI_SEL] = 0.0;
+      playSound(sndSelect);
+    } else if (step < 0.0 - 0.5) {
+      GS[GI_SEL] = GS[GI_SEL] - 1.0;
+      if (GS[GI_SEL] < 0.0) GS[GI_SEL] = count - 1.0;
+      playSound(sndSelect);
+    }
+    if (TCH[TI_JUMP_PRESSED] > 0.5 && count > 0) {
+      startLevel(floorf(GS[GI_SEL]));
+      GS[GI_STATE] = ST_PLAYING;
+      switchMusic(2.0);
+      playSound(sndSelect);
+    }
+  }
   // Touch: tap on level rows
   if (MOBILE > 0.5) {
     const s = UI[UI_SCALE];
@@ -2099,19 +2113,11 @@ function drawTouchControls(sw: number, sh: number): void {
 GS[GI_STATE] = ST_MENU;
 switchMusic(1.0);
 
-// FPS / perf tracking (Perry-safe arrays)
-const PERF = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-// [frameCount, fpsTimer, fps, updateMs, drawMs, presentMs, lastDt, dtAccum]
-const PF_COUNT = 0; const PF_TIMER = 1; const PF_FPS = 2;
-const PF_UPDATE = 3; const PF_DRAW = 4; const PF_PRESENT = 5;
-const PF_LASTDT = 6; const PF_DTACC = 7;
-
 // runGame dispatches per platform: rAF-driven on web (bloom_run_game hook),
 // blocking while-loop on native. The callback receives dt; beginDrawing/
 // endDrawing are done by runGame itself, so we don't call them in here.
 runGame((dt: number): void => {
   const t = getTime();
-  const frameStart = getTime();
 
   // Dynamic screen size (mobile fills device screen, desktop uses SCREEN_W/SCREEN_H)
   const sw = getScreenWidth();
@@ -2148,41 +2154,25 @@ runGame((dt: number): void => {
 
   } else if (state === ST_PLAYING) {
     // === GAMEPLAY ===
-    const tUpdate0 = getTime();
     updatePlayer(dt);
     updateEnemies(dt);
     updateCollectibles(dt, t);
     updateParticles(dt);
     updateCamera(dt, sw, sh);
-    const tUpdate1 = getTime();
-    PERF[PF_UPDATE] = (tUpdate1 - tUpdate0) * 1000.0;
-
-    // Draw
-    const tDraw0 = getTime();
 
     drawSkyGradient(sw, sh);
     drawParallaxBg(sw, sh);
-    const tSky = getTime();
 
     beginMode2DRaw(sw * 0.5, sh * 0.5, floorf(CAM[0]), floorf(CAM[1]), 0.0, CAM[2]);
     drawVisibleTiles(sw, sh);
-    const tTiles = getTime();
     drawCollectibles(t);
     drawEnemies(t);
     drawPlayerCharacter(t);
     drawParticles();
     endMode2D();
-    const tWorld = getTime();
 
     drawHUD(sw, sh);
     drawTouchControls(sw, sh);
-    const tDraw1 = getTime();
-    PERF[PF_DRAW] = (tDraw1 - tDraw0) * 1000.0;
-    // Sub-timings: sky | tiles | world | hud (in tenths of ms for display)
-    PERF[6] = (tSky - tDraw0) * 10000.0;
-    PERF[7] = (tTiles - tSky) * 10000.0;
-    PERF[8] = (tWorld - tTiles) * 10000.0;
-    PERF[9] = (tDraw1 - tWorld) * 10000.0;
 
     // Pause
     if (isKeyPressed(K_ESCAPE) || TCH[TI_PAUSE_PRESSED] > 0.5 || GP[GP_PAUSE] > 0.5) {
@@ -2258,16 +2248,6 @@ runGame((dt: number): void => {
       if (GS[GI_SEL] >= GS[GI_LCOUNT]) GS[GI_SEL] = 0.0;
       switchMusic(1.0);
     }
-  }
-
-  // FPS counter
-  PERF[PF_LASTDT] = dt;
-  PERF[PF_COUNT] = PERF[PF_COUNT] + 1.0;
-  PERF[PF_DTACC] = PERF[PF_DTACC] + dt;
-  if (PERF[PF_DTACC] >= 1.0) {
-    PERF[PF_FPS] = PERF[PF_COUNT] / PERF[PF_DTACC];
-    PERF[PF_COUNT] = 0.0;
-    PERF[PF_DTACC] = 0.0;
   }
 });
 

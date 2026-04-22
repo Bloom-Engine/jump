@@ -209,6 +209,104 @@ jobs:
           PERRY_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
 
   # ─────────────────────────────────────────────
+  # watchOS → TestFlight (standalone)
+  # ─────────────────────────────────────────────
+  build-watchos:
+    name: watchOS (TestFlight)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bloom engine SDK
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -rf vendor/bloom/.git vendor/bloom/.gitignore
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
+          rm -rf vendor/bloom/native/*/src vendor/bloom/native/*/Cargo.* vendor/bloom/native/shared
+          gh release download v0.1.0 --repo Bloom-Engine/engine --pattern 'libbloom_ios.a' --dir /tmp/bloom-native
+          cp /tmp/bloom-native/libbloom_ios.a vendor/bloom/native/ios/libbloom_ios.bin
+          cat > vendor/bloom/native/ios/Cargo.toml << 'TOML'
+          [package]
+          name = "bloom-ios"
+          version = "0.1.0"
+          edition = "2021"
+          build = "build.rs"
+          [lib]
+          name = "bloom_ios"
+          TOML
+          sed -i 's/^          //' vendor/bloom/native/ios/Cargo.toml
+          mkdir -p vendor/bloom/native/ios/src && touch vendor/bloom/native/ios/src/lib.rs
+          cat > vendor/bloom/native/ios/build.rs << 'BUILDRS'
+          fn main() {
+              let dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+              let target = std::env::var("TARGET").unwrap_or_default();
+              let lib = "libbloom_ios";
+              let out = if target.is_empty() {
+                  format!("{}/target/release", dir)
+              } else {
+                  format!("{}/target/{}/release", dir, target)
+              };
+              std::fs::create_dir_all(&out).unwrap();
+              std::fs::copy(
+                  format!("{}/{}.bin", dir, lib),
+                  format!("{}/{}.a", out, lib),
+              ).unwrap();
+          }
+          BUILDRS
+          sed -i 's/^          //' vendor/bloom/native/ios/build.rs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Install perry
+        run: |
+          mkdir -p /tmp/perry-install
+          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
+          sudo mv /tmp/perry-install/perry /usr/local/bin/
+          rm -rf /tmp/perry-install
+          perry --version
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Configure perry
+        run: |
+          mkdir -p ~/.perry
+          printf 'license_key = "%s"\nserver = "https://hub.perryts.com"\napi_token = "%s"\n' \
+            "$PERRY_LICENSE_KEY" "$PERRY_API_TOKEN" > ~/.perry/config.toml
+
+      - name: Set version and build number
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" perry.toml
+          sed -i "s/^build_number = .*/build_number = ${{ github.run_number }}/" perry.toml
+
+      - name: Decode signing credentials
+        run: |
+          echo "${{ secrets.APPLE_IOS_P12 }}" | base64 -d > /tmp/watchos_distribution.p12
+          echo "${{ secrets.APPLE_WATCHOS_PROVISIONING_PROFILE }}" | base64 -d > /tmp/watchos.mobileprovision
+          echo "${{ secrets.APPLE_P8_KEY }}" | base64 -d > /tmp/appstore_connect.p8
+
+      - name: Inject credential paths into perry.toml
+        run: |
+          sed -i '/^\[watchos\]/,/^\[/{s|^certificate = .*|certificate = "/tmp/watchos_distribution.p12"|}' perry.toml
+          sed -i '/^\[watchos\]/,/^\[/{s|^provisioning_profile = .*|provisioning_profile = "/tmp/watchos.mobileprovision"|}' perry.toml
+
+      - name: Publish watchOS to TestFlight
+        run: |
+          perry publish watchos \
+            --certificate /tmp/watchos_distribution.p12 \
+            --provisioning-profile /tmp/watchos.mobileprovision \
+            --apple-p8-key /tmp/appstore_connect.p8 \
+            --apple-key-id "$PERRY_APPLE_KEY_ID" \
+            --apple-issuer-id "$PERRY_APPLE_ISSUER_ID" \
+            --apple-team-id "$PERRY_APPLE_TEAM_ID"
+        env:
+          PERRY_APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          PERRY_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PERRY_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
+          PERRY_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+
+  # ─────────────────────────────────────────────
   # macOS → App Store
   # ─────────────────────────────────────────────
   build-macos:
@@ -493,3 +591,61 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
+
+  # ─────────────────────────────────────────────
+  # Web → bloomengine.dev/jump/
+  # ─────────────────────────────────────────────
+  build-web:
+    name: Web (bloomengine.dev/jump)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install perry
+        run: |
+          mkdir -p /tmp/perry-install
+          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
+          sudo mv /tmp/perry-install/perry /usr/local/bin/
+          rm -rf /tmp/perry-install
+          perry --version
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Configure perry
+        run: |
+          mkdir -p ~/.perry
+          printf 'license_key = "%s"\nserver = "https://hub.perryts.com"\napi_token = "%s"\n' \
+            "$PERRY_LICENSE_KEY" "$PERRY_API_TOKEN" > ~/.perry/config.toml
+
+      - name: Set version and build number
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" perry.toml
+          sed -i "s/^build_number = .*/build_number = ${{ github.run_number }}/" perry.toml
+
+      - name: Install Rust target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Clone bloom engine (for bloom_web crate)
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git ../engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Build web bundle
+        run: ./build-web.sh
+
+      - name: Deploy to bloomengine.dev
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o UserKnownHostsFile=~/.ssh/known_hosts" \
+            dist/web/ root@webserver.skelpo.net:/var/www/bloomengine.dev/jump/
+          echo "Deployed to https://bloomengine.dev/jump/"
