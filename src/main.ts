@@ -16,6 +16,13 @@ import {
   isGamepadAvailable, getGamepadAxis, isGamepadButtonPressed, isGamepadButtonDown,
 } from "bloom/core";
 import { Color, Key, MouseButton } from "bloom/core";
+
+// Perry's web target does not resolve imported const-object property access
+// (`K_ENTER` returns undefined at runtime). Inlining the Key values locally
+// keeps the game working on web; they stay in sync with engine/src/core/keys.ts.
+const K_A = 65, K_D = 68, K_Q = 81, K_S = 83, K_W = 87;
+const K_SPACE = 32, K_ENTER = 265, K_ESCAPE = 27;
+const K_UP = 256, K_DOWN = 257, K_LEFT = 258, K_RIGHT = 259;
 import {
   drawRect, drawCircle, drawTriangle, drawLine, drawRectLines,
 } from "bloom/shapes";
@@ -593,17 +600,18 @@ function spawnDeathParticles(x: number, y: number): void {
 
 function updateParticles(dt: number): void {
   for (let i = 0; i < MAX_PARTICLES; i = i + 1) {
-    if (PRL[i] <= 0.0) continue;
-    PRX[i] = PRX[i] + PRVX[i] * dt;
-    PRY[i] = PRY[i] + PRVY[i] * dt;
-    PRVY[i] = PRVY[i] + 400.0 * dt;
-    PRL[i] = PRL[i] - dt;
+    if (PRL[i] > 0.0) {
+      PRX[i] = PRX[i] + PRVX[i] * dt;
+      PRY[i] = PRY[i] + PRVY[i] * dt;
+      PRVY[i] = PRVY[i] + 400.0 * dt;
+      PRL[i] = PRL[i] - dt;
+    }
   }
 }
 
 function drawParticles(): void {
   for (let i = 0; i < MAX_PARTICLES; i = i + 1) {
-    if (PRL[i] <= 0.0) continue;
+    if (PRL[i] > 0.0) {
     const alpha = floorf((PRL[i] / PRM[i]) * 255.0);
     const a = clamp(alpha, 0.0, 255.0);
     const s = PRS[i];
@@ -613,6 +621,7 @@ function drawParticles(): void {
     else if (PRC[i] < 2.5) { r = 160; g = 160; b = 160; }  // gray (dust)
     else { r = 200; g = 60; b = 50; }                       // red (enemy)
     bloom_draw_rect(floorf(PRX[i] - s * 0.5), floorf(PRY[i] - s * 0.5), floorf(s), floorf(s), r, g, b, floorf(a));
+    }
   }
 }
 
@@ -847,7 +856,7 @@ function loadLevelFromString(data: string): void {
 
 
 function loadLevel(index: number): void {
-  if (index < 0 || index >= LEVEL_FILES.length) return;
+  if (index < 0 || index >= GS[GI_LCOUNT]) return;
   const path = LEVEL_FILES[floorf(index)];
   if (fileExists(path)) {
     const data = readFile(path);
@@ -883,29 +892,29 @@ function startLevel(index: number): void {
   CAM[1] = P[PI_Y];
 }
 
-// Discover level files (use readFile length check since fileExists has issues on Windows)
+// Discover level files. Note: Array.push doesn't update `.length` under
+// Perry's web target, so we track the count ourselves and assign by index.
 function discoverLevels(): void {
-  LEVEL_NAMES.length = 0;
-  LEVEL_FILES.length = 0;
-  // Check built-in levels
+  let count = 0;
   for (let i = 1; i <= 10; i = i + 1) {
     const path = "assets/levels/level" + i.toString() + ".txt";
     const data = readFile(path);
     if (data.length > 0) {
-      LEVEL_FILES.push(path);
-      LEVEL_NAMES.push("Level " + i.toString());
+      LEVEL_FILES[count] = path;
+      LEVEL_NAMES[count] = "Level " + i.toString();
+      count = count + 1;
     }
   }
-  // Check custom levels
   for (let i = 1; i <= 20; i = i + 1) {
     const path = "assets/levels/custom_" + i.toString() + ".txt";
     const data = readFile(path);
     if (data.length > 0) {
-      LEVEL_FILES.push(path);
-      LEVEL_NAMES.push("Custom " + i.toString());
+      LEVEL_FILES[count] = path;
+      LEVEL_NAMES[count] = "Custom " + i.toString();
+      count = count + 1;
     }
   }
-  GS[GI_LCOUNT] = LEVEL_FILES.length;
+  GS[GI_LCOUNT] = count;
 }
 
 // ============================================================
@@ -1059,8 +1068,8 @@ function updatePlayer(dt: number): void {
   // --- Input ---
   let moveDir = 0.0;
   // Keyboard
-  if (isKeyDown(Key.LEFT) || isKeyDown(Key.A)) moveDir = moveDir - 1.0;
-  if (isKeyDown(Key.RIGHT) || isKeyDown(Key.D)) moveDir = moveDir + 1.0;
+  if (isKeyDown(K_LEFT) || isKeyDown(K_A)) moveDir = moveDir - 1.0;
+  if (isKeyDown(K_RIGHT) || isKeyDown(K_D)) moveDir = moveDir + 1.0;
   // Touch joystick
   if (TCH[TI_JOY_X] < -0.3) moveDir = moveDir - 1.0;
   if (TCH[TI_JOY_X] > 0.3) moveDir = moveDir + 1.0;
@@ -1076,7 +1085,7 @@ function updatePlayer(dt: number): void {
   if (moveDir < -0.5) P[PI_FACE] = 0.0;
 
   // Jump buffer
-  if (isKeyPressed(Key.SPACE) || isKeyPressed(Key.UP) || isKeyPressed(Key.W)) {
+  if (isKeyPressed(K_SPACE) || isKeyPressed(K_UP) || isKeyPressed(K_W)) {
     P[PI_JBUF] = JUMP_BUFFER;
   }
   if (TCH[TI_JUMP_PRESSED] > 0.5) P[PI_JBUF] = JUMP_BUFFER;
@@ -1115,7 +1124,7 @@ function updatePlayer(dt: number): void {
 
   // Variable jump height (cut jump short on release)
   let jumpHeld = 0.0;
-  if (isKeyDown(Key.SPACE) || isKeyDown(Key.UP) || isKeyDown(Key.W)) jumpHeld = 1.0;
+  if (isKeyDown(K_SPACE) || isKeyDown(K_UP) || isKeyDown(K_W)) jumpHeld = 1.0;
   if (TCH[TI_JUMP_DOWN] > 0.5) jumpHeld = 1.0;
   if (isGamepadAvailable()) { if (isGamepadButtonDown(0)) jumpHeld = 1.0; }
   if (P[PI_VY] < 0.0 && jumpHeld < 0.5) {
@@ -1177,9 +1186,12 @@ function updateEnemies(dt: number): void {
   const playerCX = P[PI_X] + TILE_SIZE * 0.5;
   const playerCY = P[PI_Y] + TILE_SIZE * 0.5;
 
+  // Perry web-target bug (issue #135 incompletely fixed in 0.5.161): `continue`
+  // following a multi-branch if/else chain in a for loop jumps to the loop header
+  // without running the increment, pinning i and hanging. Workaround: wrap the
+  // body in `if (active) { ... }` and avoid `continue` entirely.
   for (let i = 0; i < MAX_ENEMIES; i = i + 1) {
-    if (EA[i] < 0.5) continue;
-
+    if (EA[i] >= 0.5) {
     const type = ET[i];
 
     if (type < 1.5) {
@@ -1234,40 +1246,42 @@ function updateEnemies(dt: number): void {
       EHP[i] = EHP[i] + dt * 4.0;
     }
 
-    // Player collision with enemy
-    if (P[PI_DEAD] > 0.5 || P[PI_INV] > 0.0) continue;
+    // Player collision with enemy (skip if player dead/invincible, inline the guard)
+    if (P[PI_DEAD] < 0.5 && P[PI_INV] <= 0.0) {
+      PRECT[R_X] = P[PI_X] + POX; PRECT[R_Y] = P[PI_Y] + POY;
+      ERECT[R_X] = EX[i] + 4.0; ERECT[R_Y] = EY[i] + 4.0; ERECT[R_W] = TILE_SIZE - 8.0; ERECT[R_H] = TILE_SIZE - 8.0;
 
-    PRECT[R_X] = P[PI_X] + POX; PRECT[R_Y] = P[PI_Y] + POY;
-    ERECT[R_X] = EX[i] + 4.0; ERECT[R_Y] = EY[i] + 4.0; ERECT[R_W] = TILE_SIZE - 8.0; ERECT[R_H] = TILE_SIZE - 8.0;
-
-    if (aabbOverlap(PRECT[R_X], PRECT[R_Y], PRECT[R_W], PRECT[R_H], ERECT[R_X], ERECT[R_Y], ERECT[R_W], ERECT[R_H])) {
-      // Check if stomping (player falling and above enemy)
-      if (P[PI_VY] > 0.0 && P[PI_PBOTY] < EY[i] + 12.0 && type < 3.5) {
-        // Stomp! (flyers can't be stomped: type === E_FLYER check)
-        if (type < 1.5 || type > 2.5) {
-          // Walker or Chaser - can be stomped
-          EA[i] = 0.0;
-          P[PI_VY] = STOMP_BOUNCE;
-          spawnDustParticles(EX[i] + TILE_SIZE * 0.5, EY[i] + TILE_SIZE, 6);
-          playSound(sndStomp);
+      if (aabbOverlap(PRECT[R_X], PRECT[R_Y], PRECT[R_W], PRECT[R_H], ERECT[R_X], ERECT[R_Y], ERECT[R_W], ERECT[R_H])) {
+        // Check if stomping (player falling and above enemy)
+        if (P[PI_VY] > 0.0 && P[PI_PBOTY] < EY[i] + 12.0 && type < 3.5) {
+          // Stomp! (flyers can't be stomped: type === E_FLYER check)
+          if (type < 1.5 || type > 2.5) {
+            // Walker or Chaser - can be stomped
+            EA[i] = 0.0;
+            P[PI_VY] = STOMP_BOUNCE;
+            spawnDustParticles(EX[i] + TILE_SIZE * 0.5, EY[i] + TILE_SIZE, 6);
+            playSound(sndStomp);
+          } else {
+            // Flyer - can't stomp, take damage
+            hurtPlayer();
+          }
         } else {
-          // Flyer - can't stomp, take damage
+          // Side/bottom collision - take damage
           hurtPlayer();
         }
-      } else {
-        // Side/bottom collision - take damage
-        hurtPlayer();
       }
     }
+    } // end if (EA[i] >= 0.5)
   }
 }
 
 function drawEnemies(t: number): void {
   for (let i = 0; i < MAX_ENEMIES; i = i + 1) {
-    if (EA[i] < 0.5) continue;
-    const frame = floorf(EHP[i]) % 2;
-    const facingR = ES[i] > 0.5 ? 1.0 : 0.0;
-    drawEnemySprite(floorf(ET[i]), frame, floorf(EX[i]), floorf(EY[i]), facingR);
+    if (EA[i] >= 0.5) {
+      const frame = floorf(EHP[i]) % 2;
+      const facingR = ES[i] > 0.5 ? 1.0 : 0.0;
+      drawEnemySprite(floorf(ET[i]), frame, floorf(EX[i]), floorf(EY[i]), facingR);
+    }
   }
 }
 
@@ -1281,41 +1295,42 @@ function updateCollectibles(dt: number, t: number): void {
   PRECT[R_X] = P[PI_X] + POX; PRECT[R_Y] = P[PI_Y] + POY;
 
   for (let i = 0; i < MAX_COINS; i = i + 1) {
-    if (CA[i] < 0.5) continue;
-    const type = CT[i];
+    if (CA[i] >= 0.5) {
+      const type = CT[i];
 
-    ERECT[R_X] = CX[i] + 6.0; ERECT[R_Y] = CY[i] + 6.0; ERECT[R_W] = 20.0; ERECT[R_H] = 20.0;
+      ERECT[R_X] = CX[i] + 6.0; ERECT[R_Y] = CY[i] + 6.0; ERECT[R_W] = 20.0; ERECT[R_H] = 20.0;
 
-    if (aabbOverlap(PRECT[R_X], PRECT[R_Y], PRECT[R_W], PRECT[R_H], ERECT[R_X], ERECT[R_Y], ERECT[R_W], ERECT[R_H])) {
-      if (type > 9.5 && type < 10.5) {
-        // Coin
-        CA[i] = 0.0;
-        P[PI_COINS] = P[PI_COINS] + 1.0;
-        P[PI_TCOINS] = P[PI_TCOINS] + 1.0;
-        spawnCoinParticles(CX[i] + TILE_SIZE * 0.5, CY[i] + TILE_SIZE * 0.5);
-        playSound(sndCoin);
-        // Extra life at 100 coins
-        if (P[PI_TCOINS] >= 100.0) {
-          P[PI_TCOINS] = P[PI_TCOINS] - 100.0;
-          P[PI_LIVES] = P[PI_LIVES] + 1.0;
+      if (aabbOverlap(PRECT[R_X], PRECT[R_Y], PRECT[R_W], PRECT[R_H], ERECT[R_X], ERECT[R_Y], ERECT[R_W], ERECT[R_H])) {
+        if (type > 9.5 && type < 10.5) {
+          // Coin
+          CA[i] = 0.0;
+          P[PI_COINS] = P[PI_COINS] + 1.0;
+          P[PI_TCOINS] = P[PI_TCOINS] + 1.0;
+          spawnCoinParticles(CX[i] + TILE_SIZE * 0.5, CY[i] + TILE_SIZE * 0.5);
+          playSound(sndCoin);
+          // Extra life at 100 coins
+          if (P[PI_TCOINS] >= 100.0) {
+            P[PI_TCOINS] = P[PI_TCOINS] - 100.0;
+            P[PI_LIVES] = P[PI_LIVES] + 1.0;
+          }
+        } else if (type > 10.5 && type < 11.5) {
+          // Gem
+          CA[i] = 0.0;
+          P[PI_GEMS] = P[PI_GEMS] + 1.0;
+          spawnCoinParticles(CX[i] + TILE_SIZE * 0.5, CY[i] + TILE_SIZE * 0.5);
+          playSound(sndGem);
+        } else if (type > 11.5 && type < 12.5) {
+          // Spring
+          P[PI_VY] = SPRING_VEL;
+          P[PI_GND] = 0.0;
+          P[PI_SQUASH] = -0.2;
+          playSound(sndSpring);
+        } else if (type > 19.5) {
+          // Flag - level complete!
+          GS[GI_FLAG] = 1.0;
+          GS[GI_CTIMER] = 2.0;
+          playSound(sndComplete);
         }
-      } else if (type > 10.5 && type < 11.5) {
-        // Gem
-        CA[i] = 0.0;
-        P[PI_GEMS] = P[PI_GEMS] + 1.0;
-        spawnCoinParticles(CX[i] + TILE_SIZE * 0.5, CY[i] + TILE_SIZE * 0.5);
-        playSound(sndGem);
-      } else if (type > 11.5 && type < 12.5) {
-        // Spring
-        P[PI_VY] = SPRING_VEL;
-        P[PI_GND] = 0.0;
-        P[PI_SQUASH] = -0.2;
-        playSound(sndSpring);
-      } else if (type > 19.5) {
-        // Flag - level complete!
-        GS[GI_FLAG] = 1.0;
-        GS[GI_CTIMER] = 2.0;
-        playSound(sndComplete);
       }
     }
   }
@@ -1323,35 +1338,31 @@ function updateCollectibles(dt: number, t: number): void {
 
 function drawCollectibles(t: number): void {
   for (let i = 0; i < MAX_COINS; i = i + 1) {
-    if (CA[i] < 0.5) continue;
-    const type = CT[i];
+    if (CA[i] >= 0.5) {
+      const type = CT[i];
 
-    if (type > 9.5 && type < 10.5) {
-      // Coin (spinning animation)
-      const frame = floorf(t * 6.0) % 4;
-      drawItemSprite(frame, floorf(CX[i]), floorf(CY[i]));
-    } else if (type > 10.5 && type < 11.5) {
-      // Gem
-      drawItemSprite(4, floorf(CX[i]), floorf(CY[i]));
-    } else if (type > 11.5 && type < 12.5) {
-      // Spring
-      drawItemSprite(5, floorf(CX[i]), floorf(CY[i]));
-    } else if (type > 19.5) {
-      // Flag — BIG visible marker
-      const fx = floorf(CX[i]);
-      const fy = floorf(CY[i]);
-      // Large bright green background glow
-      bloom_draw_rect(fx - 8, fy - 128, 48, 160, 50, 255, 50, 60);
-      // Tall pole
-      bloom_draw_rect(fx + 14, fy - 120, 5, 152, 160, 160, 170, 255);
-      // Big red banner
-      bloom_draw_rect(fx + 19, fy - 116, 32, 24, 230, 40, 40, 255);
-      const wave = Math.sin(t * 4.0) * 4.0;
-      bloom_draw_triangle(fx + 51, fy - 116, fx + 51, fy - 92, fx + 60 + floorf(wave), fy - 104, 210, 30, 30, 255);
-      // Gold ball on top
-      bloom_draw_circle(fx + 16, fy - 124, 6, 255, 220, 50, 255);
-      // "GOAL" text above
-      drawTextRgba("GOAL", fx - 2, fy - 148, 18, 255, 255, 50, 255);
+      if (type > 9.5 && type < 10.5) {
+        // Coin (spinning animation)
+        const frame = floorf(t * 6.0) % 4;
+        drawItemSprite(frame, floorf(CX[i]), floorf(CY[i]));
+      } else if (type > 10.5 && type < 11.5) {
+        // Gem
+        drawItemSprite(4, floorf(CX[i]), floorf(CY[i]));
+      } else if (type > 11.5 && type < 12.5) {
+        // Spring
+        drawItemSprite(5, floorf(CX[i]), floorf(CY[i]));
+      } else if (type > 19.5) {
+        // Flag — BIG visible marker
+        const fx = floorf(CX[i]);
+        const fy = floorf(CY[i]);
+        bloom_draw_rect(fx - 8, fy - 128, 48, 160, 50, 255, 50, 60);
+        bloom_draw_rect(fx + 14, fy - 120, 5, 152, 160, 160, 170, 255);
+        bloom_draw_rect(fx + 19, fy - 116, 32, 24, 230, 40, 40, 255);
+        const wave = Math.sin(t * 4.0) * 4.0;
+        bloom_draw_triangle(fx + 51, fy - 116, fx + 51, fy - 92, fx + 60 + floorf(wave), fy - 104, 210, 30, 30, 255);
+        bloom_draw_circle(fx + 16, fy - 124, 6, 255, 220, 50, 255);
+        drawTextRgba("GOAL", fx - 2, fy - 148, 18, 255, 255, 50, 255);
+      }
     }
   }
 }
@@ -1629,17 +1640,17 @@ function updateTitleScreen(sw: number, sh: number): void {
   DBG_PROOF[0] = DBG_PROOF[0] + 1.0;
   const menuMax = 1.0;
   // Keyboard / gamepad navigation
-  if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S) || GP[GP_DOWN] > 0.5) {
+  if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || GP[GP_DOWN] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
     if (GS[GI_SEL] > menuMax) GS[GI_SEL] = 0.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.UP) || isKeyPressed(Key.W) || GP[GP_UP] > 0.5) {
+  if (isKeyPressed(K_UP) || isKeyPressed(K_W) || GP[GP_UP] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] - 1.0;
     if (GS[GI_SEL] < 0.0) GS[GI_SEL] = menuMax;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE) || GP[GP_CONFIRM] > 0.5) {
+  if (isKeyPressed(265) || isKeyPressed(32) || GP[GP_CONFIRM] > 0.5) {
     selectMenuItem(sw, sh);
   }
   // Touch: tap on menu items
@@ -1852,7 +1863,7 @@ function drawCreditsScreen(t: number, dt: number, sw: number, sh: number): void 
   // Return to menu when scrolled past everything, or on any key/touch
   let dismiss = 0.0;
   if (CRED[0] > totalH) dismiss = 1.0;
-  if (isKeyPressed(Key.ESCAPE) || isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE)) dismiss = 1.0;
+  if (isKeyPressed(K_ESCAPE) || isKeyPressed(K_ENTER) || isKeyPressed(K_SPACE)) dismiss = 1.0;
   if (GP[GP_CONFIRM] > 0.5 || GP[GP_PAUSE] > 0.5) dismiss = 1.0;
   if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) dismiss = 1.0;
   if (dismiss > 0.5) {
@@ -1911,17 +1922,17 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
 function updateLevelSelect(sw: number, sh: number): void {
   const count = floorf(GS[GI_LCOUNT]);
   // Keyboard / gamepad navigation
-  if (isKeyPressed(Key.DOWN) || isKeyPressed(Key.S) || GP[GP_DOWN] > 0.5) {
+  if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || GP[GP_DOWN] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
     if (GS[GI_SEL] >= count) GS[GI_SEL] = 0.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.UP) || isKeyPressed(Key.W) || GP[GP_UP] > 0.5) {
+  if (isKeyPressed(K_UP) || isKeyPressed(K_W) || GP[GP_UP] > 0.5) {
     GS[GI_SEL] = GS[GI_SEL] - 1.0;
     if (GS[GI_SEL] < 0.0) GS[GI_SEL] = count - 1.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(Key.ENTER) || isKeyPressed(Key.SPACE) || GP[GP_CONFIRM] > 0.5) {
+  if (isKeyPressed(K_ENTER) || isKeyPressed(K_SPACE) || GP[GP_CONFIRM] > 0.5) {
     if (count > 0) {
       startLevel(floorf(GS[GI_SEL]));
       GS[GI_STATE] = ST_PLAYING;
@@ -1929,7 +1940,7 @@ function updateLevelSelect(sw: number, sh: number): void {
       playSound(sndSelect);
     }
   }
-  if (isKeyPressed(Key.ESCAPE) || GP[GP_PAUSE] > 0.5) {
+  if (isKeyPressed(K_ESCAPE) || GP[GP_PAUSE] > 0.5) {
     GS[GI_STATE] = ST_MENU;
     GS[GI_SEL] = 0.0;
   }
@@ -2174,7 +2185,7 @@ runGame((dt: number): void => {
     PERF[9] = (tDraw1 - tWorld) * 10000.0;
 
     // Pause
-    if (isKeyPressed(Key.ESCAPE) || TCH[TI_PAUSE_PRESSED] > 0.5 || GP[GP_PAUSE] > 0.5) {
+    if (isKeyPressed(K_ESCAPE) || TCH[TI_PAUSE_PRESSED] > 0.5 || GP[GP_PAUSE] > 0.5) {
       GS[GI_STATE] = ST_PAUSED;
     }
 
@@ -2192,10 +2203,10 @@ runGame((dt: number): void => {
     drawHUD(sw, sh);
     drawPauseScreen(sw, sh);
 
-    if (isKeyPressed(Key.ESCAPE) || GP[GP_CONFIRM] > 0.5) {
+    if (isKeyPressed(K_ESCAPE) || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_PLAYING;
     }
-    if (isKeyPressed(Key.Q) || GP[GP_PAUSE] > 0.5) {
+    if (isKeyPressed(K_Q) || GP[GP_PAUSE] > 0.5) {
       GS[GI_STATE] = ST_MENU;
       GS[GI_SEL] = 0.0;
       switchMusic(1.0);
@@ -2219,7 +2230,7 @@ runGame((dt: number): void => {
     drawGameOver(sw, sh);
     let goAnyTap = 0.0;
     if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) goAnyTap = 1.0;
-    if (isKeyPressed(Key.ENTER) || goAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
+    if (isKeyPressed(K_ENTER) || goAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL];
       P[PI_LIVES] = 3.0;
@@ -2241,7 +2252,7 @@ runGame((dt: number): void => {
 
     let lcAnyTap = 0.0;
     if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) lcAnyTap = 1.0;
-    if (isKeyPressed(Key.ENTER) || lcAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
+    if (isKeyPressed(K_ENTER) || lcAnyTap > 0.5 || GP[GP_CONFIRM] > 0.5) {
       GS[GI_STATE] = ST_LEVEL_SELECT;
       GS[GI_SEL] = GS[GI_LEVEL] + 1.0;
       if (GS[GI_SEL] >= GS[GI_LCOUNT]) GS[GI_SEL] = 0.0;

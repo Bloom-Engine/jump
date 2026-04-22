@@ -23,3 +23,5 @@ android/app/src/main/assets/
 pkg/
 bloom_web_shim.js
 bloom_jump_web.html
+.claude/
+.perry/
