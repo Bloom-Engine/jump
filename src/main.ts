@@ -897,6 +897,16 @@ function discoverLevels(): void {
 // ============================================================
 
 function playerTileCollisionX(): void {
+  // Clamp to level horizontal bounds so player can't walk off-screen
+  const levelRight = LVL[0] * TILE_SIZE;
+  if (P[PI_X] + POX < 0.0) {
+    P[PI_X] = 0.0 - POX;
+    if (P[PI_VX] < 0.0) P[PI_VX] = 0.0;
+  } else if (P[PI_X] + POX + PW > levelRight) {
+    P[PI_X] = levelRight - PW - POX;
+    if (P[PI_VX] > 0.0) P[PI_VX] = 0.0;
+  }
+
   const px = P[PI_X] + POX;
   const py = P[PI_Y] + POY;
 
