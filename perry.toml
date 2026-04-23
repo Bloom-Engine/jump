@@ -19,6 +19,34 @@ signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
 [linux]
 distribute = "github"
 
+[publish]
+exclude = [
+  ".git",
+  ".claude",
+  ".perry",
+  "node_modules",
+  "target",
+  "dist",
+  "android/app/build",
+  "android/app/src/main/jniLibs",
+  "android/app/src/main/assets",
+  "android/.gradle",
+  "android/.kotlin",
+  "tvos-xcode",
+  "watchos-xcode",
+  "*.app",
+  "jump",
+  "editor",
+  "bloom_jump",
+  "bloom_jump_mac",
+  "repro",
+  "test_bug",
+  "*.o",
+  "*.so",
+  "perry-array-bug-repro.ts",
+  "PERRY-BUG-ARRAY-INDEX-READ.md",
+]
+
 [macos]
 bundle_id = "com.bloom.jump"
 certificate = "/Users/amlug/.perry/macos_appstore.p12"
