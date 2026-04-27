@@ -909,29 +909,33 @@ function startLevel(index: number): void {
   CAM[1] = P[PI_Y];
 }
 
-// Discover level files. Note: Array.push doesn't update `.length` under
-// Perry's web target, so we track the count ourselves and assign by index.
+// Discover level files. Use `.push()` rather than `arr[i] = ...`: Perry's
+// native codegen drops index assignments into module-level arrays that were
+// declared empty (`const A: T[] = []`) — both the value and `.length` writes
+// vanish, even when read back from inside the same function. Pre-initialized
+// arrays (`const P = [0.0, 0.0, ...]`) don't have this problem.
 function discoverLevels(): void {
-  let count = 0;
+  // Idempotent — keep the cached list once populated. Re-entry on each
+  // menu→Play click would otherwise grow the list because the .length=0
+  // clear pattern is also broken (see comment above).
+  if (LEVEL_FILES.length > 0) { GS[GI_LCOUNT] = LEVEL_FILES.length; return; }
   for (let i = 1; i <= 10; i = i + 1) {
     const path = "assets/levels/level" + i.toString() + ".txt";
     const data = readFile(path);
     if (data.length > 0) {
-      LEVEL_FILES[count] = path;
-      LEVEL_NAMES[count] = "Level " + i.toString();
-      count = count + 1;
+      LEVEL_FILES.push(path);
+      LEVEL_NAMES.push("Level " + i.toString());
     }
   }
   for (let i = 1; i <= 20; i = i + 1) {
     const path = "assets/levels/custom_" + i.toString() + ".txt";
     const data = readFile(path);
     if (data.length > 0) {
-      LEVEL_FILES[count] = path;
-      LEVEL_NAMES[count] = "Custom " + i.toString();
-      count = count + 1;
+      LEVEL_FILES.push(path);
+      LEVEL_NAMES.push("Custom " + i.toString());
     }
   }
-  GS[GI_LCOUNT] = count;
+  GS[GI_LCOUNT] = LEVEL_FILES.length;
 }
 
 // ============================================================
