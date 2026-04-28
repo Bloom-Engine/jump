@@ -506,6 +506,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install bloom engine SDK
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -rf vendor/bloom/.git vendor/bloom/.gitignore
+          rm -rf vendor/bloom/docs vendor/bloom/examples vendor/bloom/scripts
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
@@ -555,6 +564,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install bloom engine SDK
+        run: |
+          git clone --depth 1 https://github.com/Bloom-Engine/engine.git vendor/bloom
+          rm -rf vendor/bloom/.git vendor/bloom/.gitignore
+          rm -rf vendor/bloom/docs vendor/bloom/examples vendor/bloom/scripts
+          sed -i 's|"bloom": "file:../engine/"|"bloom": "file:./vendor/bloom/"|' package.json
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Install perry
         run: |
