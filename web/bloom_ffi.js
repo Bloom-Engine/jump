@@ -80,6 +80,49 @@ function installInputListeners() {
   });
 }
 
+// ----- Audio bridge: pull samples from the Rust mixer into a Web Audio sink -----
+// `bloom_audio_mix(&mut [f32])` fills a stereo-interleaved buffer (LRLRLR…) with
+// every currently-playing sound mixed at the source sample rate (44.1 kHz for
+// jump's WAVs). bloom_web's `bloom_init_audio` is a no-op on web by design — the
+// comment in lib.rs says "Audio initialization is handled by JS glue (Web Audio
+// API AudioContext)", which is what we install here.
+//
+// Browsers block AudioContext until a user gesture, so we lazily create + resume
+// on first input event. ScriptProcessorNode is deprecated but ubiquitous and
+// simpler than AudioWorklet for a single mix stream.
+const AUDIO_FRAMES = 2048; // per onaudioprocess tick, ~46 ms at 44.1 kHz
+function installAudioBridge() {
+  let ctx = null;
+  let node = null;
+  let mixBuf = null;
+
+  const start = () => {
+    if (!ctx) {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return;
+      ctx = new Ctor();
+      mixBuf = new Float32Array(AUDIO_FRAMES * 2);
+      node = ctx.createScriptProcessor(AUDIO_FRAMES, 0, 2);
+      node.onaudioprocess = (e) => {
+        bloom.bloom_audio_mix(mixBuf);
+        const out = e.outputBuffer;
+        const left = out.getChannelData(0);
+        const right = out.getChannelData(1);
+        for (let i = 0; i < AUDIO_FRAMES; i++) {
+          left[i] = mixBuf[i * 2];
+          right[i] = mixBuf[i * 2 + 1];
+        }
+      };
+      node.connect(ctx.destination);
+    }
+    if (ctx.state === "suspended") ctx.resume();
+  };
+
+  ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
+    addEventListener(ev, start, { passive: true })
+  );
+}
+
 // Perry's wrapFfiForI64 has a "small integer" return short-circuit that returns
 // the Number unchanged — but WASM i64 imports require BigInt. e.g. bloom_get_platform
 // returns 7.0 → WASM throws "Cannot convert 7 to a BigInt". We wrap every ffi entry
@@ -213,6 +256,7 @@ async function boot() {
 
   await init(); // wasm-bindgen init
   installInputListeners();
+  installAudioBridge();
 
   // wgpu surface/device setup is async on the web. Perry's main() is synchronous
   // and calls bloom functions immediately after initWindow — which would panic
