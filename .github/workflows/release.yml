@@ -652,6 +652,11 @@ jobs:
 
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          # Don't auto-resolve "latest" — the action's GH-API call has been
+          # returning the stale v0.9.1, whose bundled wasm-opt rejects modern
+          # bloom_web bytecode ("failed to execute wasm-opt: exit code 1").
+          version: 'v0.14.0'
 
       - name: Clone bloom engine (for bloom_web crate)
         run: |
