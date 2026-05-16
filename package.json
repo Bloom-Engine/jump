@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "main": "src/main.ts",
   "dependencies": {
-    "bloom": "file:../engine/"
+    "@bloomengine/engine": "^0.3.2"
   }
 }

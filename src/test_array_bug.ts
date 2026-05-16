@@ -13,24 +13,24 @@ import {
   getScreenWidth, getScreenHeight, closeWindow,
   beginMode2D, endMode2D, getScreenToWorld2D,
   writeFile, readFile, fileExists,
-} from "bloom/core";
-import { Color, Key, Camera2D, MouseButton } from "bloom/core";
+} from "@bloomengine/engine/core";
+import { Color, Key, Camera2D, MouseButton } from "@bloomengine/engine/core";
 import {
   drawRect, drawCircle, drawTriangle, drawLine, drawRectLines,
   checkCollisionRecs,
-} from "bloom/shapes";
-import { drawText, measureText } from "bloom/text";
+} from "@bloomengine/engine/shapes";
+import { drawText, measureText } from "@bloomengine/engine/text";
 import {
   loadTexture, drawTexturePro, drawTextureRec,
   setTextureFilter, FILTER_NEAREST,
   stageTextures, commitTexture,
-} from "bloom/textures";
+} from "@bloomengine/engine/textures";
 import {
   initAudioDevice, closeAudioDevice,
   loadSound, playSound, setSoundVolume,
-} from "bloom/audio";
-import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
-import { Rect, Texture, Sound } from "bloom/core";
+} from "@bloomengine/engine/audio";
+import { clamp, randomFloat, randomInt, lerp } from "@bloomengine/engine/math";
+import { Rect, Texture, Sound } from "@bloomengine/engine/core";
 
 // ============================================================
 // Mirror the game's exact module-level array layout

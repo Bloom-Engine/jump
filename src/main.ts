@@ -14,8 +14,8 @@ import {
   isMobile, isTV, isWatch, getPlatform, getCrownRotation,
   getTouchX, getTouchY, getTouchCount,
   isGamepadAvailable, getGamepadAxis, isGamepadButtonPressed, isGamepadButtonDown,
-} from "bloom/core";
-import { Color, Key, MouseButton } from "bloom/core";
+} from "@bloomengine/engine/core";
+import { Color, Key, MouseButton } from "@bloomengine/engine/core";
 
 // Perry's web target does not resolve imported const-object property access
 // (`K_ENTER` returns undefined at runtime). Inlining the Key values locally
@@ -25,16 +25,16 @@ const K_SPACE = 32, K_ENTER = 265, K_ESCAPE = 27;
 const K_UP = 256, K_DOWN = 257, K_LEFT = 258, K_RIGHT = 259;
 import {
   drawRect, drawCircle, drawTriangle, drawLine, drawRectLines,
-} from "bloom/shapes";
-import { drawTextRgba, measureText } from "bloom/text";
-import { FILTER_NEAREST } from "bloom/textures";
+} from "@bloomengine/engine/shapes";
+import { drawTextRgba, measureText } from "@bloomengine/engine/text";
+import { FILTER_NEAREST } from "@bloomengine/engine/textures";
 import {
   initAudioDevice, closeAudioDevice,
   loadSound, playSound, setSoundVolume,
   loadMusicRaw, playMusicRaw, stopMusicRaw, updateMusicStreamRaw, setMusicVolumeRaw,
-} from "bloom/audio";
-import { clamp, randomFloat, randomInt, lerp } from "bloom/math";
-import { Texture, Sound } from "bloom/core";
+} from "@bloomengine/engine/audio";
+import { clamp, randomFloat, randomInt, lerp } from "@bloomengine/engine/math";
+import { Texture, Sound } from "@bloomengine/engine/core";
 
 // Direct FFI declaration — bypasses TypeScript wrapper object creation/property access overhead.
 // Each drawTexturePro via the wrapper creates 4 objects + 16 property lookups.

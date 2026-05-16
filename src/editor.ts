@@ -10,21 +10,21 @@ import {
   getScreenWidth, getScreenHeight, closeWindow,
   beginMode2D, endMode2D, getScreenToWorld2D,
   writeFile, readFile, fileExists,
-} from "bloom/core";
-import { Color, Key, Camera2D, MouseButton } from "bloom/core";
+} from "@bloomengine/engine/core";
+import { Color, Key, Camera2D, MouseButton } from "@bloomengine/engine/core";
 import {
   drawRect, drawRectLines, drawLine,
-} from "bloom/shapes";
-import { drawText, measureText } from "bloom/text";
+} from "@bloomengine/engine/shapes";
+import { drawText, measureText } from "@bloomengine/engine/text";
 import {
   loadTexture, drawTexturePro,
   setTextureFilter, FILTER_NEAREST,
-} from "bloom/textures";
+} from "@bloomengine/engine/textures";
 import {
   initAudioDevice, closeAudioDevice, loadSound, playSound,
-} from "bloom/audio";
-import { clamp } from "bloom/math";
-import { Texture, Sound } from "bloom/core";
+} from "@bloomengine/engine/audio";
+import { clamp } from "@bloomengine/engine/math";
+import { Texture, Sound } from "@bloomengine/engine/core";
 
 // ============================================================
 // CONSTANTS
