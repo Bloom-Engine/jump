@@ -65,7 +65,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -164,7 +166,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -263,7 +267,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -362,7 +368,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -462,7 +470,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -518,7 +528,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -577,7 +589,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
@@ -627,7 +641,9 @@ jobs:
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
-          gh release download --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
+          PERRY_TAG=$(gh release list --repo PerryTS/perry --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+          echo "Installing perry $PERRY_TAG"
+          gh release download "$PERRY_TAG" --repo PerryTS/perry --pattern 'perry-linux-x86_64.tar.gz' --dir /tmp/perry-install
           tar xzf /tmp/perry-install/perry-linux-x86_64.tar.gz -C /tmp/perry-install
           sudo mv /tmp/perry-install/perry /usr/local/bin/
           rm -rf /tmp/perry-install
