@@ -24,8 +24,8 @@ exclude = [
   ".git",
   ".claude",
   ".perry",
-  "node_modules",
   "target",
+  "node_modules/**/target",
   "dist",
   "android/app/build",
   "android/app/src/main/jniLibs",
@@ -59,12 +59,12 @@ notarize_signing_identity = "Developer ID Application: Skelpo GmbH"
 signing_identity = "Mac App Distribution: Skelpo GmbH"
 
 [project]
-build_number = 57
+build_number = 58
 bundle_id = "com.bloom.jump"
 entry = "src/main.ts"
 features = ["ios-game-loop", "watchos-swift-app"]
 name = "bloom-jump"
-version = "1.0.55"
+version = "1.0.56"
 
 [project.icons]
 source = "assets/icon.png"
