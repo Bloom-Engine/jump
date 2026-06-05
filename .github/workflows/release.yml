@@ -205,7 +205,7 @@ jobs:
   # macOS → App Store
   # ─────────────────────────────────────────────
   build-macos:
-    name: macOS (App Store)
+    name: macOS (App Store + DMG)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -253,8 +253,11 @@ jobs:
           sed -i '/^\[macos\]/,/^\[/{s|^notarize_certificate = .*|notarize_certificate = "/tmp/macos_devid.p12"|}' perry.toml
           sed -i '/^\[macos\]/,/^\[/{s|^provisioning_profile = .*|provisioning_profile = "/tmp/macos.provisionprofile"|}' perry.toml
 
-      - name: Publish macOS to App Store
+      - name: Publish macOS (App Store + notarized DMG)
         run: |
+          # perry.toml has distribute = "both": uploads the .pkg to App Store
+          # Connect AND builds a Developer ID-signed, notarized .dmg, which is
+          # downloaded to dist/.
           perry publish macos \
             --certificate /tmp/macos_appstore.p12 \
             --provisioning-profile /tmp/macos.provisionprofile \
@@ -267,6 +270,22 @@ jobs:
           PERRY_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           PERRY_APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           PERRY_APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
+
+      - name: Attach notarized DMG to GitHub release
+        run: |
+          DMG=$(ls dist/*.dmg 2>/dev/null | head -1)
+          if [ -z "$DMG" ]; then
+            echo "::error::No notarized DMG found in dist/ — expected from distribute = \"both\""
+            ls -la dist/ 2>/dev/null || true
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          CLEAN="BloomJump-${VERSION}-macOS.dmg"
+          cp "$DMG" "$CLEAN"
+          echo "Uploading $CLEAN to release $GITHUB_REF_NAME"
+          gh release upload "$GITHUB_REF_NAME" "$CLEAN" --clobber --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   # ─────────────────────────────────────────────
   # Android → Play Store
