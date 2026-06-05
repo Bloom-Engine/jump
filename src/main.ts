@@ -1886,7 +1886,7 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
   const rowH = floorf(40.0 * s);
   if (count < 1) {
     const emptySize = floorf(20.0 * s);
-    drawTextRgba("No levels found in assets/levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, { r: 200, g: 200, b: 200, a: 200 });
+    drawTextRgba("No levels found in assets/levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, 200, 200, 200, 200);
     drawTextRgba("Run the editor to create levels!", floorf(170.0 * s), floorf(290.0 * s), emptySize, 200, 200, 200, 200);
   }
 
@@ -2029,7 +2029,7 @@ function drawGameOver(sw: number, sh: number): void {
   const instrSize = floorf(20.0 * s);
   if (MOBILE > 0.5) {
     const iw = measureText("Tap to continue", instrSize);
-    drawTextRgba("Tap to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, { r: 200, g: 200, b: 220, a: 200 });
+    drawTextRgba("Tap to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
   } else if (TV > 0.5) {
     const iw = measureText("Press A to continue", instrSize);
     drawTextRgba("Press A to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
