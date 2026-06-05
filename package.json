@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "main": "src/main.ts",
   "dependencies": {
-    "@bloomengine/engine": "0.4.4"
+    "@bloomengine/engine": "0.4.5"
   },
   "perry": {
     "allow": {
-      "nativeLibrary": ["@bloomengine/*"]
+      "nativeLibrary": [
+        "@bloomengine/*"
+      ]
     }
   }
 }
