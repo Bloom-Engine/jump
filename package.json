@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/main.ts",
   "dependencies": {
-    "@bloomengine/engine": "0.4.5"
+    "@bloomengine/engine": "^0.4.6"
   },
   "perry": {
     "allow": {
