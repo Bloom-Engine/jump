@@ -64,7 +64,7 @@ bundle_id = "com.bloom.jump"
 entry = "src/main.ts"
 features = ["ios-game-loop", "watchos-swift-app"]
 name = "bloom-jump"
-version = "1.0.74"
+version = "1.0.75"
 
 [project.icons]
 source = "assets/icon.png"
