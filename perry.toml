@@ -49,6 +49,7 @@ exclude = [
 
 [macos]
 bundle_id = "com.bloom.jump"
+provisioning_profile = "/Users/amlug/.perry/com_bloom_jump_macos.provisionprofile"
 certificate = "/Users/amlug/.perry/macos_appstore.p12"
 distribute = "both"
 encryption_exempt = true
@@ -64,7 +65,7 @@ bundle_id = "com.bloom.jump"
 entry = "src/main.ts"
 features = ["ios-game-loop", "watchos-swift-app"]
 name = "bloom-jump"
-version = "1.0.76"
+version = "1.0.77"
 
 [project.icons]
 source = "assets/icon.png"
