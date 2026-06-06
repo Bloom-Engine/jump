@@ -458,6 +458,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Install perry
         run: |
           mkdir -p /tmp/perry-install
@@ -494,11 +497,9 @@ jobs:
           # bloom_web bytecode ("failed to execute wasm-opt: exit code 1").
           version: 'v0.14.0'
 
-      - name: Clone bloom engine (for bloom_web crate)
-        run: |
-          git clone --depth 1 https://github.com/Bloom-Engine/engine.git ../engine
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # bloom_web is built from the npm-installed engine (node_modules) by
+      # build-web.sh, so the runtime glue matches the game WASM's FFI ABI.
+      # No separate engine clone needed.
 
       - name: Build web bundle
         run: ./build-web.sh

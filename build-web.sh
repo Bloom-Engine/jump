@@ -14,7 +14,11 @@
 set -euo pipefail
 
 JUMP_DIR="$(cd "$(dirname "$0")" && pwd)"
-BLOOM_WEB="$JUMP_DIR/../engine/native/web"
+# Build bloom_web from the SAME engine the game compiles against (node_modules),
+# so the runtime glue and the game WASM's FFI ABI never skew. Falls back to a
+# sibling engine source checkout (../engine) for local engine development.
+BLOOM_WEB="$JUMP_DIR/node_modules/@bloomengine/engine/native/web"
+[ -d "$BLOOM_WEB" ] || BLOOM_WEB="$JUMP_DIR/../engine/native/web"
 OUT="$JUMP_DIR/dist/web"
 
 skip_bloom=false
