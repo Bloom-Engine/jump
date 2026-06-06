@@ -80,3 +80,6 @@ signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
 
 [windows]
 distribute = "github"
+# GUI game that renders its own window but doesn't import perry/ui, so force
+# the WINDOWS subsystem — otherwise Windows pops a console window alongside it.
+subsystem = "windows"
