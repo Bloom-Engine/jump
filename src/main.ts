@@ -8,10 +8,10 @@ import {
   clearBackground, setTargetFPS, setDirect2DMode, getDeltaTime, getTime,
   isKeyPressed, isKeyDown, isKeyReleased,
   getMouseX, getMouseY, isMouseButtonPressed,
-  getScreenWidth, getScreenHeight, closeWindow,
+  getScreenWidth, getScreenHeight, closeWindow, toggleFullscreen,
   beginMode2DRaw, endMode2D, getScreenToWorld2D,
   writeFile, readFile, fileExists,
-  isMobile, isTV, isWatch, getPlatform, getCrownRotation,
+  isMobile, isTV, isWatch, getPlatform, getLanguage, getCrownRotation,
   getTouchX, getTouchY, getTouchCount,
   isGamepadAvailable, getGamepadAxis, isGamepadButtonPressed, isGamepadButtonDown,
 } from "@bloomengine/engine/core";
@@ -23,6 +23,8 @@ import { Color, Key, MouseButton } from "@bloomengine/engine/core";
 const K_A = 65, K_D = 68, K_Q = 81, K_S = 83, K_W = 87;
 const K_SPACE = 32, K_ENTER = 265, K_ESCAPE = 27;
 const K_UP = 256, K_DOWN = 257, K_LEFT = 258, K_RIGHT = 259;
+const K_F11 = 122;
+const MB_LEFT = 0; // MouseButton.LEFT — inlined for web-target safety
 import {
   drawRect, drawCircle, drawTriangle, drawLine, drawRectLines,
 } from "@bloomengine/engine/shapes";
@@ -53,6 +55,9 @@ declare function bloom_draw_circle(cx: number, cy: number, radius: number, r: nu
 declare function bloom_draw_line(x1: number, y1: number, x2: number, y2: number, thickness: number, r: number, g: number, b: number, a: number): void;
 declare function bloom_draw_triangle(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, r: number, g: number, b: number, a: number): void;
 declare function bloom_draw_text(text: number, x: number, y: number, size: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_load_font(path: number, size: number): number;
+declare function bloom_draw_text_ex(font: number, text: number, x: number, y: number, size: number, spacing: number, r: number, g: number, b: number, a: number): void;
+declare function bloom_measure_text_ex(font: number, text: number, size: number, spacing: number): number;
 
 // ============================================================
 // PLATFORM DETECTION
@@ -69,6 +74,70 @@ if (PLATF[0] > 7.5 && PLATF[0] < 8.5) PLATF[3] = 1.0;  // watchOS
 const MOBILE = PLATF[1];
 const TV = PLATF[2];
 const WATCH = PLATF[3];
+
+// ============================================================
+// I18N — auto-generated translation table (13 languages).
+// Language index from getLanguage(); see pickLanguage(). CJK/Thai
+// (ja/ko/th/zh) fall back to English until the Unicode font ships
+// (CJK_FONT_READY). Edit tools/gen_i18n.py to regenerate.
+// ============================================================
+const CJK_FONT_READY = true; // set true once assets/fonts CJK+Thai font is bundled
+function pickLanguage(): number {
+  const v = getLanguage();
+  if (v === 25966.0) return 0; // en
+  if (v === 25701.0) return 1; // de
+  if (v === 25971.0) return 2; // es
+  if (v === 26226.0) return 3; // fr
+  if (v === 26996.0) return 4; // it
+  if (v === 27233.0) return CJK_FONT_READY ? 5 : 0; // ja
+  if (v === 27503.0) return CJK_FONT_READY ? 6 : 0; // ko
+  if (v === 28788.0) return 7; // pt
+  if (v === 29800.0) return CJK_FONT_READY ? 8 : 0; // th
+  if (v === 29810.0) return 9; // tr
+  if (v === 30313.0) return 10; // vi
+  if (v === 26980.0) return 11; // id
+  if (v === 31336.0) return CJK_FONT_READY ? 12 : 0; // zh
+  return 0; // default English
+}
+const LANG = pickLanguage();
+// CJK/Thai font state: [fontHandle, useFlag]. Loaded after initWindow.
+const I18N = [0.0, 0.0];
+function L(a: string[]): string { return a[LANG]; }
+
+const TR_LOADING: string[] = ["Loading...", "Lädt...", "Cargando...", "Chargement...", "Caricamento...", "読み込み中...", "불러오는 중...", "Carregando...", "กำลังโหลด...", "Yükleniyor...", "Đang tải...", "Memuat...", "加载中..."];
+const TR_SUBTITLE: string[] = ["A Bloom Engine Platformer", "Ein Bloom Engine Jump-'n'-Run", "Un plataformas de Bloom Engine", "Un jeu de plateforme Bloom Engine", "Un platform di Bloom Engine", "Bloom Engine プラットフォーマー", "Bloom Engine 플랫포머", "Um plataforma da Bloom Engine", "เกมแพลตฟอร์ม Bloom Engine", "Bir Bloom Engine platform oyunu", "Game nền tảng Bloom Engine", "Platformer Bloom Engine", "Bloom Engine 平台游戏"];
+const TR_PLAY: string[] = ["Play Game", "Spielen", "Jugar", "Jouer", "Gioca", "ゲーム開始", "게임 시작", "Jogar", "เริ่มเกม", "Oyna", "Chơi", "Main", "开始游戏"];
+const TR_INFO: string[] = ["Info", "Info", "Información", "Infos", "Info", "情報", "정보", "Info", "ข้อมูล", "Bilgi", "Thông tin", "Info", "信息"];
+const TR_HINT_KB: string[] = ["Arrow Keys / WASD to move, SPACE to jump", "Pfeiltasten / WASD bewegen, LEERTASTE springen", "Flechas / WASD mover, ESPACIO saltar", "Flèches / WASD pour bouger, ESPACE pour sauter", "Frecce / WASD muovi, SPAZIO salta", "矢印 / WASD で移動、スペースでジャンプ", "화살표 / WASD 이동, 스페이스 점프", "Setas / WASD mover, ESPAÇO pular", "ลูกศร / WASD เคลื่อนที่, เว้นวรรค กระโดด", "Yön tuşları / WASD hareket, BOŞLUK zıpla", "Phím mũi tên / WASD di chuyển, SPACE nhảy", "Panah / WASD bergerak, SPASI lompat", "方向键 / WASD 移动，空格跳跃"];
+const TR_HINT_TOUCH_PLAY: string[] = ["Tap Play to begin", "Zum Starten tippen", "Toca Jugar para empezar", "Touchez Jouer pour commencer", "Tocca Gioca per iniziare", "タップして開始", "탭하여 시작", "Toque em Jogar para começar", "แตะเล่นเพื่อเริ่ม", "Başlamak için dokun", "Chạm Chơi để bắt đầu", "Ketuk Main untuk mulai", "点击开始"];
+const TR_HINT_TV_SELECT: string[] = ["Press A to select", "A drücken zum Auswählen", "Pulsa A para seleccionar", "Appuyez sur A pour sélectionner", "Premi A per selezionare", "A で選択", "A로 선택", "Pressione A para selecionar", "กด A เพื่อเลือก", "Seçmek için A'ya bas", "Nhấn A để chọn", "Tekan A untuk pilih", "按 A 选择"];
+const TR_HINT_CROWN: string[] = ["Crown to move, tap to jump", "Krone bewegen, tippen springen", "Corona mover, toca saltar", "Couronne pour bouger, touchez pour sauter", "Corona muovi, tocca salta", "クラウンで移動、タップでジャンプ", "크라운 이동, 탭 점프", "Coroa mover, toque pular", "หมุนคราวน์เคลื่อนที่ แตะกระโดด", "Taç ile hareket, dokun zıpla", "Vương miện di chuyển, chạm nhảy", "Crown bergerak, ketuk lompat", "表冠移动，点击跳跃"];
+const TR_SELECT_LEVEL: string[] = ["SELECT LEVEL", "LEVEL WÄHLEN", "ELEGIR NIVEL", "CHOISIR UN NIVEAU", "SCEGLI LIVELLO", "レベル選択", "레벨 선택", "ESCOLHER NÍVEL", "เลือกด่าน", "SEVİYE SEÇ", "CHỌN MÀN", "PILIH LEVEL", "选择关卡"];
+const TR_BACK: string[] = ["< Back", "< Zurück", "< Atrás", "< Retour", "< Indietro", "< 戻る", "< 뒤로", "< Voltar", "< กลับ", "< Geri", "< Quay lại", "< Kembali", "< 返回"];
+const TR_HINT_LS_KB: string[] = ["Click or ENTER to play, ESC / Back to return", "Klick oder ENTER spielen, ESC / Zurück", "Clic o ENTER jugar, ESC / Atrás", "Clic ou ENTRÉE jouer, ÉCHAP / Retour", "Clic o INVIO gioca, ESC / Indietro", "クリックかENTERで開始、ESCで戻る", "클릭/ENTER 시작, ESC 뒤로", "Clique ou ENTER jogar, ESC / Voltar", "คลิกหรือ ENTER เล่น, ESC กลับ", "Tıkla/ENTER oyna, ESC geri", "Nhấp/ENTER chơi, ESC quay lại", "Klik/ENTER main, ESC kembali", "点击或回车开始，ESC 返回"];
+const TR_HINT_LS_TOUCH: string[] = ["Tap a level to play", "Level antippen zum Spielen", "Toca un nivel para jugar", "Touchez un niveau pour jouer", "Tocca un livello per giocare", "レベルをタップして開始", "레벨을 탭하여 시작", "Toque num nível para jogar", "แตะด่านเพื่อเล่น", "Oynamak için seviyeye dokun", "Chạm màn để chơi", "Ketuk level untuk main", "点击关卡开始"];
+const TR_HINT_LS_TV: string[] = ["A to play, Menu to go back", "A spielen, Menü zurück", "A jugar, Menú atrás", "A jouer, Menu retour", "A gioca, Menu indietro", "A で開始、メニューで戻る", "A 시작, 메뉴 뒤로", "A jogar, Menu voltar", "A เล่น, เมนู กลับ", "A oyna, Menü geri", "A chơi, Menu quay lại", "A main, Menu kembali", "A 开始，菜单返回"];
+const TR_NO_LEVELS1: string[] = ["No levels found", "Keine Level gefunden", "No se encontraron niveles", "Aucun niveau trouvé", "Nessun livello trovato", "レベルが見つかりません", "레벨을 찾을 수 없음", "Nenhum nível encontrado", "ไม่พบด่าน", "Seviye bulunamadı", "Không tìm thấy màn", "Tidak ada level", "未找到关卡"];
+const TR_NO_LEVELS2: string[] = ["Run the editor to create levels!", "Erstelle Level im Editor!", "¡Usa el editor para crear niveles!", "Utilisez l'éditeur pour créer des niveaux !", "Usa l'editor per creare livelli!", "エディタでレベルを作成！", "에디터로 레벨을 만드세요!", "Use o editor para criar níveis!", "ใช้เอดิเตอร์สร้างด่าน!", "Seviye oluşturmak için editörü kullan!", "Dùng trình chỉnh sửa để tạo màn!", "Gunakan editor untuk membuat level!", "用编辑器创建关卡！"];
+const TR_PAUSED: string[] = ["PAUSED", "PAUSE", "PAUSA", "PAUSE", "PAUSA", "一時停止", "일시정지", "PAUSA", "หยุดชั่วคราว", "DURAKLATILDI", "TẠM DỪNG", "JEDA", "已暂停"];
+const TR_RESUME: string[] = ["Resume", "Weiter", "Continuar", "Reprendre", "Riprendi", "再開", "계속", "Continuar", "เล่นต่อ", "Devam", "Tiếp tục", "Lanjut", "继续"];
+const TR_QUIT_MENU: string[] = ["Quit to Menu", "Zum Menü", "Salir al menú", "Quitter au menu", "Esci al menu", "メニューへ", "메뉴로 나가기", "Sair para o menu", "กลับเมนู", "Menüye dön", "Về menu", "Ke menu", "退出到菜单"];
+const TR_HINT_PAUSE_KB: string[] = ["Click a button, or ESC to Resume / Q to Quit", "Knopf klicken, ESC weiter / Q beenden", "Clic, ESC continuar / Q salir", "Cliquez, ÉCHAP reprendre / Q quitter", "Clicca, ESC riprendi / Q esci", "クリック、ESCで再開 / Qで終了", "클릭, ESC 계속 / Q 종료", "Clique, ESC continuar / Q sair", "คลิก, ESC เล่นต่อ / Q ออก", "Tıkla, ESC devam / Q çık", "Nhấp, ESC tiếp / Q thoát", "Klik, ESC lanjut / Q keluar", "点击，ESC 继续 / Q 退出"];
+const TR_HINT_PAUSE_TOUCH: string[] = ["Tap to Resume or Quit", "Tippen: Weiter oder Beenden", "Toca para continuar o salir", "Touchez pour reprendre ou quitter", "Tocca per riprendere o uscire", "タップで再開・終了", "탭하여 계속/종료", "Toque para continuar ou sair", "แตะเพื่อเล่นต่อหรือออก", "Devam/çıkış için dokun", "Chạm để tiếp/thoát", "Ketuk untuk lanjut/keluar", "点击继续或退出"];
+const TR_HINT_PAUSE_TV: string[] = ["A to Resume, Menu to Quit", "A weiter, Menü beenden", "A continuar, Menú salir", "A reprendre, Menu quitter", "A riprendi, Menu esci", "A で再開、メニューで終了", "A 계속, 메뉴 종료", "A continuar, Menu sair", "A เล่นต่อ, เมนู ออก", "A devam, Menü çık", "A tiếp, Menu thoát", "A lanjut, Menu keluar", "A 继续，菜单退出"];
+const TR_GAME_OVER: string[] = ["GAME OVER", "GAME OVER", "FIN DEL JUEGO", "PARTIE TERMINÉE", "GAME OVER", "ゲームオーバー", "게임 오버", "FIM DE JOGO", "เกมโอเวอร์", "OYUN BİTTİ", "HẾT LƯỢT", "GAME OVER", "游戏结束"];
+const TR_COINS: string[] = ["Coins", "Münzen", "Monedas", "Pièces", "Monete", "コイン", "코인", "Moedas", "เหรียญ", "Para", "Xu", "Koin", "金币"];
+const TR_GEMS: string[] = ["Gems", "Edelsteine", "Gemas", "Gemmes", "Gemme", "ジェム", "보석", "Gemas", "อัญมณี", "Mücevher", "Ngọc", "Permata", "宝石"];
+const TR_LIVES: string[] = ["Lives", "Leben", "Vidas", "Vies", "Vite", "残機", "목숨", "Vidas", "ชีวิต", "Can", "Mạng", "Nyawa", "生命"];
+const TR_HINT_CONT_TOUCH: string[] = ["Tap to continue", "Tippen zum Fortfahren", "Toca para continuar", "Touchez pour continuer", "Tocca per continuare", "タップで続行", "탭하여 계속", "Toque para continuar", "แตะเพื่อไปต่อ", "Devam için dokun", "Chạm để tiếp tục", "Ketuk untuk lanjut", "点击继续"];
+const TR_HINT_CONT_TV: string[] = ["Press A to continue", "A drücken zum Fortfahren", "Pulsa A para continuar", "Appuyez sur A pour continuer", "Premi A per continuare", "A で続行", "A로 계속", "Pressione A para continuar", "กด A เพื่อไปต่อ", "Devam için A'ya bas", "Nhấn A để tiếp tục", "Tekan A untuk lanjut", "按 A 继续"];
+const TR_HINT_CONT_KB: string[] = ["Press ENTER to continue", "ENTER drücken zum Fortfahren", "Pulsa ENTER para continuar", "Appuyez sur ENTRÉE pour continuer", "Premi INVIO per continuare", "ENTER で続行", "ENTER로 계속", "Pressione ENTER para continuar", "กด ENTER เพื่อไปต่อ", "Devam için ENTER'a bas", "Nhấn ENTER để tiếp tục", "Tekan ENTER untuk lanjut", "按回车继续"];
+const TR_LEVEL_COMPLETE: string[] = ["LEVEL COMPLETE!", "LEVEL GESCHAFFT!", "¡NIVEL COMPLETADO!", "NIVEAU TERMINÉ !", "LIVELLO COMPLETATO!", "レベルクリア！", "레벨 완료!", "NÍVEL CONCLUÍDO!", "ผ่านด่าน!", "SEVİYE TAMAM!", "HOÀN THÀNH MÀN!", "LEVEL SELESAI!", "关卡完成！"];
+const TR_LEVEL: string[] = ["Level", "Level", "Nivel", "Niveau", "Livello", "レベル", "레벨", "Nível", "ด่าน", "Seviye", "Màn", "Level", "关卡"];
+const TR_CUSTOM: string[] = ["Custom", "Eigen", "Personalizado", "Perso", "Personalizzato", "カスタム", "커스텀", "Personalizado", "กำหนดเอง", "Özel", "Tùy chỉnh", "Kustom", "自定义"];
+const TR_GOAL: string[] = ["GOAL", "ZIEL", "META", "BUT", "TRAGUARDO", "ゴール", "골", "META", "เป้าหมาย", "HEDEF", "ĐÍCH", "TUJUAN", "终点"];
+const TR_JUMP: string[] = ["Jump", "Springen", "Saltar", "Sauter", "Salta", "ジャンプ", "점프", "Pular", "กระโดด", "Zıpla", "Nhảy", "Lompat", "跳"];
+
 
 // Crown accumulator — smooths Digital Crown rotation into a [-1,1] horizontal
 // axis value used by the player-movement code. Crown deltas are radians since
@@ -293,11 +362,20 @@ setTargetFPS(60);
 setDirect2DMode(true);
 initAudioDevice();
 
+// Load the CJK/Thai subset font when the active language needs it (built-in
+// font has no glyphs for ja/ko/zh/th). Raw handle avoids the Perry aarch64
+// obj.field NaN bug. Latin glyphs are included so numbers/title still render.
+if (LANG === 5) I18N[0] = bloom_load_font("assets/fonts/bloom_ja.ttf" as any, 64.0);
+else if (LANG === 6) I18N[0] = bloom_load_font("assets/fonts/bloom_ko.ttf" as any, 64.0);
+else if (LANG === 8) I18N[0] = bloom_load_font("assets/fonts/bloom_th.ttf" as any, 64.0);
+else if (LANG === 12) I18N[0] = bloom_load_font("assets/fonts/bloom_zh.ttf" as any, 64.0);
+if (I18N[0] !== 0.0) I18N[1] = 1.0;
+
 
 // Show loading screen
 beginDrawing();
 clearBackground(LOADING_BG);
-drawTextRgba("Loading...", getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, 200, 200, 220, 255);
+dtext(L(TR_LOADING), getScreenWidth() / 2 - 60, getScreenHeight() / 2 - 10, 24, 200, 200, 220, 255);
 endDrawing();
 
 // Load single atlas texture (all sprites in one sheet = zero texture switches).
@@ -361,6 +439,22 @@ function maxf(a: number, b: number): number { if (a > b) return a; return b; }
 function minf(a: number, b: number): number { if (a < b) return a; return b; }
 function absf(a: number): number { if (a < 0.0) return 0.0 - a; return a; }
 function floorf(a: number): number { return Math.floor(a); }
+
+// Text routing: CJK/Thai languages render through the bundled subset font
+// (drawTextEx); everything else uses the built-in font (drawTextRgba).
+function dtext(text: string, x: number, y: number, size: number, r: number, g: number, b: number, a: number): void {
+  if (I18N[1] > 0.5) bloom_draw_text_ex(I18N[0], text as any, x, y, size, 0.0, r, g, b, a);
+  else drawTextRgba(text, x, y, size, r, g, b, a);
+}
+function mtext(text: string, size: number): number {
+  if (I18N[1] > 0.5) return bloom_measure_text_ex(I18N[0], text as any, size, 0.0);
+  return measureText(text, size);
+}
+
+// Axis-aligned point-in-rect test for desktop mouse / touch hit regions.
+function pointInRect(px: number, py: number, x: number, y: number, w: number, h: number): boolean {
+  return px >= x && px <= x + w && py >= y && py <= y + h;
+}
 
 function isTileSolid(t: number): number {
   if (t === T_GRASS || t === T_DIRT || t === T_BRICK || t === T_STONE) return 1.0;
@@ -924,7 +1018,7 @@ function discoverLevels(): void {
     const data = readFile(path);
     if (data.length > 0) {
       LEVEL_FILES.push(path);
-      LEVEL_NAMES.push("Level " + i.toString());
+      LEVEL_NAMES.push((L(TR_LEVEL) + " ") + i.toString());
     }
   }
   for (let i = 1; i <= 20; i = i + 1) {
@@ -932,7 +1026,7 @@ function discoverLevels(): void {
     const data = readFile(path);
     if (data.length > 0) {
       LEVEL_FILES.push(path);
-      LEVEL_NAMES.push("Custom " + i.toString());
+      LEVEL_NAMES.push((L(TR_CUSTOM) + " ") + i.toString());
     }
   }
   GS[GI_LCOUNT] = LEVEL_FILES.length;
@@ -1382,7 +1476,7 @@ function drawCollectibles(t: number): void {
         const wave = Math.sin(t * 4.0) * 4.0;
         bloom_draw_triangle(fx + 51, fy - 116, fx + 51, fy - 92, fx + 60 + floorf(wave), fy - 104, 210, 30, 30, 255);
         bloom_draw_circle(fx + 16, fy - 124, 6, 255, 220, 50, 255);
-        drawTextRgba("GOAL", fx - 2, fy - 148, 18, 255, 255, 50, 255);
+        dtext(L(TR_GOAL), fx - 2, fy - 148, 18, 255, 255, 50, 255);
       }
     }
   }
@@ -1535,17 +1629,17 @@ function drawHUD(sw: number, sh: number): void {
   const coinX = floorf(130.0 * s);
   const coinIconSize = floorf(24.0 * s);
   bloom_draw_texture_pro(UI_TEX_ID, ATLAS_UI_X + 32.0, ATLAS_UI_Y, 16, 16, coinX, floorf(14.0 * s), coinIconSize, coinIconSize, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0);
-  drawTextRgba("x" + floorf(P[PI_COINS]).toString(), floorf(158.0 * s), floorf(16.0 * s), textSize, 255, 255, 255, 255);
+  dtext("x" + floorf(P[PI_COINS]).toString(), floorf(158.0 * s), floorf(16.0 * s), textSize, 255, 255, 255, 255);
 
   // Gem count
   if (P[PI_GEMS] > 0.0) {
     drawItemSprite(4, floorf(220.0 * s), margin);
-    drawTextRgba("x" + floorf(P[PI_GEMS]).toString(), floorf(254.0 * s), floorf(16.0 * s), textSize, 255, 255, 255, 255);
+    dtext("x" + floorf(P[PI_GEMS]).toString(), floorf(254.0 * s), floorf(16.0 * s), textSize, 255, 255, 255, 255);
   }
 
   // Lives
   const livesSize = floorf(20.0 * s);
-  drawTextRgba("Lives: " + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, 255, 255, 255, 255);
+  dtext((L(TR_LIVES) + ": ") + floorf(P[PI_LIVES]).toString(), sw - floorf(120.0 * s), floorf(16.0 * s), livesSize, 255, 255, 255, 255);
 }
 
 // ============================================================
@@ -1563,48 +1657,48 @@ function drawTitleScreen(t: number, sw: number, sh: number): void {
   // Title
   const titleSize = floorf(60.0 * s);
   const titleText = "BLOOM JUMP";
-  const titleW = measureText(titleText, titleSize);
-  drawTextRgba(titleText, floorf((sw - titleW) / 2.0), floorf(120.0 * s), titleSize, 255, 255, 255, 255);
+  const titleW = mtext(titleText, titleSize);
+  dtext(titleText, floorf((sw - titleW) / 2.0), floorf(120.0 * s), titleSize, 255, 255, 255, 255);
 
   // Subtitle
   const subSize = floorf(20.0 * s);
-  const subText = "A Bloom Engine Platformer";
-  const subW = measureText(subText, subSize);
-  drawTextRgba(subText, floorf((sw - subW) / 2.0), floorf(190.0 * s), subSize, 220, 220, 255, 255);
+  const subText = L(TR_SUBTITLE);
+  const subW = mtext(subText, subSize);
+  dtext(subText, floorf((sw - subW) / 2.0), floorf(190.0 * s), subSize, 220, 220, 255, 255);
 
   // Menu options
   const menuCount = 2;
   const menuSize = floorf(30.0 * s);
-  const options = ["Play Game", "Info"];
+  const options = [L(TR_PLAY), L(TR_INFO)];
   const selIdx = floorf(GS[GI_SEL]);
   for (let i = 0; i < menuCount; i = i + 1) {
     const label = options[i];
     const oy = floorf((300.0 + i * 50.0) * s);
-    const ow = measureText(label, menuSize);
+    const ow = mtext(label, menuSize);
     const ox = floorf((sw - ow) / 2.0);
     if (i === selIdx) {
       const pulse = Math.sin(t * 4.0) * 0.3 + 0.7;
       const alpha = floorf(255.0 * pulse);
-      drawTextRgba("> " + label + " <", floorf(ox - 30.0 * s), oy, menuSize, 255, 255, 100, alpha);
+      dtext("> " + label + " <", floorf(ox - 30.0 * s), oy, menuSize, 255, 255, 100, alpha);
     } else {
-      drawTextRgba(label, ox, oy, menuSize, 200, 200, 220, 200);
+      dtext(label, ox, oy, menuSize, 200, 200, 220, 200);
     }
   }
 
   // Instructions
   const instrSize = floorf(16.0 * s);
   if (WATCH > 0.5) {
-    const iw = measureText("Crown to move, tap to jump", instrSize);
-    drawTextRgba("Crown to move, tap to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_CROWN), instrSize);
+    dtext(L(TR_HINT_CROWN), floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   } else if (MOBILE > 0.5) {
-    const iw = measureText("Tap Play to begin", instrSize);
-    drawTextRgba("Tap Play to begin", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_TOUCH_PLAY), instrSize);
+    dtext(L(TR_HINT_TOUCH_PLAY), floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
-    const iw = measureText("Press A to select", instrSize);
-    drawTextRgba("Press A to select", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_TV_SELECT), instrSize);
+    dtext(L(TR_HINT_TV_SELECT), floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   } else {
-    const iw = measureText("Arrow Keys / WASD to move, SPACE to jump", instrSize);
-    drawTextRgba("Arrow Keys / WASD to move, SPACE to jump", floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_KB), instrSize);
+    dtext(L(TR_HINT_KB), floorf((sw - iw) / 2.0), floorf(sh - 60.0 * s), instrSize, 180, 180, 200, 180);
   }
 
 }
@@ -1669,6 +1763,22 @@ function updateTitleScreen(sw: number, sh: number): void {
             GS[GI_SEL] = mi;
             selectMenuItem(sw, sh);
           }
+        }
+      }
+    }
+  }
+  // Desktop: mouse hover highlights a menu item, left-click selects it.
+  // Regions match the menu layout in drawTitleScreen / the touch block above.
+  if (MOBILE < 0.5 && TV < 0.5) {
+    const s = UI[UI_SCALE];
+    const mx = getMouseX();
+    const my = getMouseY();
+    for (let mi = 0; mi < 2; mi = mi + 1) {
+      const itemY = floorf((300.0 + mi * 50.0) * s);
+      if (mx > sw * 0.1 && mx < sw * 0.9 && my > itemY - 10.0 && my < itemY + floorf(40.0 * s)) {
+        GS[GI_SEL] = mi;
+        if (isMouseButtonPressed(MB_LEFT)) {
+          selectMenuItem(sw, sh);
         }
       }
     }
@@ -1820,22 +1930,22 @@ function drawCreditsScreen(t: number, dt: number, sw: number, sh: number): void 
 
     if (fontSize > 0) {
       const text = CREDITS_TEXT[i];
-      const tw = measureText(text, fontSize);
+      const tw = mtext(text, fontSize);
       const tx = floorf((sw - tw) / 2.0);
       const ty = floorf(lineY);
 
       if (lineType < 1.5) {
         // Heading — bright gold
-        drawTextRgba(text, tx, ty, fontSize, 255, 220, 80, a);
+        dtext(text, tx, ty, fontSize, 255, 220, 80, a);
       } else if (lineType < 2.5) {
         // Subheading — soft cyan
-        drawTextRgba(text, tx, ty, fontSize, 120, 220, 255, a);
+        dtext(text, tx, ty, fontSize, 120, 220, 255, a);
       } else if (lineType < 3.5) {
         // Body — white
-        drawTextRgba(text, tx, ty, fontSize, 255, 255, 255, a);
+        dtext(text, tx, ty, fontSize, 255, 255, 255, a);
       } else {
         // Small — dim
-        drawTextRgba(text, tx, ty, fontSize, 160, 160, 180, a);
+        dtext(text, tx, ty, fontSize, 160, 160, 180, a);
       }
     }
 
@@ -1865,6 +1975,7 @@ function drawCreditsScreen(t: number, dt: number, sw: number, sh: number): void 
   if (isKeyPressed(K_ESCAPE) || isKeyPressed(K_ENTER) || isKeyPressed(K_SPACE)) dismiss = 1.0;
   if (GP[GP_CONFIRM] > 0.5 || GP[GP_PAUSE] > 0.5) dismiss = 1.0;
   if ((MOBILE > 0.5 || WATCH > 0.5) && getTouchCount() > 0.0) dismiss = 1.0;
+  if (MOBILE < 0.5 && TV < 0.5 && isMouseButtonPressed(MB_LEFT)) dismiss = 1.0;
   if (dismiss > 0.5) {
     GS[GI_STATE] = ST_MENU;
     GS[GI_SEL] = 0.0;
@@ -1878,16 +1989,28 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
 
   const s = UI[UI_SCALE];
   const titleSize = floorf(36.0 * s);
-  const tw = measureText("SELECT LEVEL", titleSize);
-  drawTextRgba("SELECT LEVEL", floorf((sw - tw) / 2.0), floorf(40.0 * s), titleSize, 255, 255, 255, 255);
+  const tw = mtext(L(TR_SELECT_LEVEL), titleSize);
+  dtext(L(TR_SELECT_LEVEL), floorf((sw - tw) / 2.0), floorf(40.0 * s), titleSize, 255, 255, 255, 255);
+
+  // Back button (top-left) — clickable on desktop, tappable on mobile.
+  // Hover-highlight on desktop so it reads as a button.
+  const backSize = floorf(22.0 * s);
+  const backLabel = L(TR_BACK);
+  const backW = mtext(backLabel, backSize);
+  const backHover = pointInRect(getMouseX(), getMouseY(),
+    floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s)) && MOBILE < 0.5 && TV < 0.5;
+  bloom_draw_rect(floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s),
+    255, 255, 255, backHover ? 60 : 30);
+  dtext(backLabel, floorf(28.0 * s), floorf(40.0 * s), backSize,
+    255, 255, 255, backHover ? 255 : 220);
 
   const count = floorf(GS[GI_LCOUNT]);
   const itemSize = floorf(24.0 * s);
   const rowH = floorf(40.0 * s);
   if (count < 1) {
     const emptySize = floorf(20.0 * s);
-    drawTextRgba("No levels found in assets/levels/ directory", floorf(150.0 * s), floorf(250.0 * s), emptySize, 200, 200, 200, 200);
-    drawTextRgba("Run the editor to create levels!", floorf(170.0 * s), floorf(290.0 * s), emptySize, 200, 200, 200, 200);
+    dtext(L(TR_NO_LEVELS1), floorf(150.0 * s), floorf(250.0 * s), emptySize, 200, 200, 200, 200);
+    dtext(L(TR_NO_LEVELS2), floorf(170.0 * s), floorf(290.0 * s), emptySize, 200, 200, 200, 200);
   }
 
   const selIdx = floorf(GS[GI_SEL]);
@@ -1899,22 +2022,22 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
 
     if (i === selIdx) {
       bloom_draw_rect(floorf(80.0 * s), oy - floorf(4.0 * s), sw - floorf(160.0 * s), floorf(36.0 * s), 255, 255, 255, 30);
-      drawTextRgba("> " + name, floorf(100.0 * s), oy, itemSize, 255, 255, 100, 255);
+      dtext("> " + name, floorf(100.0 * s), oy, itemSize, 255, 255, 100, 255);
     } else {
-      drawTextRgba(name, floorf(120.0 * s), oy, itemSize, 200, 200, 220, 200);
+      dtext(name, floorf(120.0 * s), oy, itemSize, 200, 200, 220, 200);
     }
   }
 
   const instrSize = floorf(18.0 * s);
   if (MOBILE > 0.5) {
-    const iw = measureText("Tap a level to play", instrSize);
-    drawTextRgba("Tap a level to play", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_LS_TOUCH), instrSize);
+    dtext(L(TR_HINT_LS_TOUCH), floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
-    const iw = measureText("A to play, Menu to go back", instrSize);
-    drawTextRgba("A to play, Menu to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_LS_TV), instrSize);
+    dtext(L(TR_HINT_LS_TV), floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   } else {
-    const iw = measureText("ENTER to play, ESC to go back", instrSize);
-    drawTextRgba("ENTER to play, ESC to go back", floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_LS_KB), instrSize);
+    dtext(L(TR_HINT_LS_KB), floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   }
 }
 
@@ -1943,6 +2066,37 @@ function updateLevelSelect(sw: number, sh: number): void {
     GS[GI_STATE] = ST_MENU;
     GS[GI_SEL] = 0.0;
   }
+  // Desktop: mouse hover highlights a row, left-click plays it; the Back
+  // button (top-left) returns to the menu.
+  if (MOBILE < 0.5 && TV < 0.5) {
+    const ms = UI[UI_SCALE];
+    const mx = getMouseX();
+    const my = getMouseY();
+    const backW = mtext(L(TR_BACK), floorf(22.0 * ms));
+    const overBack = pointInRect(mx, my, floorf(16.0 * ms), floorf(34.0 * ms), backW + floorf(24.0 * ms), floorf(34.0 * ms));
+    if (overBack) {
+      if (isMouseButtonPressed(MB_LEFT)) {
+        GS[GI_STATE] = ST_MENU;
+        GS[GI_SEL] = 0.0;
+        playSound(sndSelect);
+      }
+    } else {
+      for (let i = 0; i < count; i = i + 1) {
+        if (i >= LEVEL_NAMES.length) break;
+        const oy = floorf((100.0 + i * 40.0) * ms);
+        if (oy > sh - floorf(80.0 * ms)) break;
+        if (pointInRect(mx, my, floorf(80.0 * ms), oy - floorf(4.0 * ms), sw - floorf(160.0 * ms), floorf(36.0 * ms))) {
+          GS[GI_SEL] = i;
+          if (isMouseButtonPressed(MB_LEFT)) {
+            startLevel(floorf(i));
+            GS[GI_STATE] = ST_PLAYING;
+            switchMusic(2.0);
+            playSound(sndSelect);
+          }
+        }
+      }
+    }
+  }
   // Watch: crown scrolls the level list, a tap confirms the highlight.
   if (WATCH > 0.5) {
     const step = consumeCrownStep();
@@ -1962,13 +2116,19 @@ function updateLevelSelect(sw: number, sh: number): void {
       playSound(sndSelect);
     }
   }
-  // Touch: tap on level rows
+  // Touch: tap the Back button or a level row
   if (MOBILE > 0.5) {
     const s = UI[UI_SCALE];
+    const backW = mtext(L(TR_BACK), floorf(22.0 * s));
     const tc = getTouchCount();
     for (let ti = 0.0; ti < tc; ti = ti + 1.0) {
       const tx = getTouchX(ti);
       const ty = getTouchY(ti);
+      if (pointInRect(tx, ty, floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s))) {
+        GS[GI_STATE] = ST_MENU;
+        GS[GI_SEL] = 0.0;
+        playSound(sndSelect);
+      }
       for (let li = 0.0; li < count; li = li + 1.0) {
         const oy = (100.0 + li * 40.0) * s;
         if (ty > oy - 4.0 * s && ty < oy + 36.0 * s && tx > 40.0 * s && tx < sw - 40.0 * s) {
@@ -1986,29 +2146,41 @@ function drawPauseScreen(sw: number, sh: number): void {
   const s = UI[UI_SCALE];
   bloom_draw_rect(0, 0, sw, sh, 0, 0, 0, 150);
   const pauseSize = floorf(48.0 * s);
-  const text = "PAUSED";
-  const tw = measureText(text, pauseSize);
-  drawTextRgba(text, floorf((sw - tw) / 2.0), floorf(220.0 * s), pauseSize, 255, 255, 255, 255);
+  const text = L(TR_PAUSED);
+  const tw = mtext(text, pauseSize);
+  dtext(text, floorf((sw - tw) / 2.0), floorf(220.0 * s), pauseSize, 255, 255, 255, 255);
 
   const btnSize = floorf(28.0 * s);
-  const resumeLabel = "Resume";
-  const resumeW = measureText(resumeLabel, btnSize);
-  drawTextRgba(resumeLabel, floorf((sw - resumeW) / 2.0), floorf(290.0 * s), btnSize, 200, 200, 220, 200);
+  const desktop = MOBILE < 0.5 && TV < 0.5;
+  const mx = getMouseX();
+  const my = getMouseY();
+  const btnX = floorf(sw * 0.2);
+  const btnW = floorf(sw * 0.6);
 
-  const quitLabel = "Quit to Menu";
-  const quitW = measureText(quitLabel, btnSize);
-  drawTextRgba(quitLabel, floorf((sw - quitW) / 2.0), floorf(340.0 * s), btnSize, 200, 200, 220, 200);
+  // Resume button (hit region matches the click handler in the ST_PAUSED state)
+  const resumeHover = desktop && pointInRect(mx, my, btnX, floorf(280.0 * s), btnW, floorf(40.0 * s));
+  if (desktop) bloom_draw_rect(btnX, floorf(280.0 * s), btnW, floorf(40.0 * s), 255, 255, 255, resumeHover ? 55 : 22);
+  const resumeLabel = L(TR_RESUME);
+  const resumeW = mtext(resumeLabel, btnSize);
+  dtext(resumeLabel, floorf((sw - resumeW) / 2.0), floorf(290.0 * s), btnSize, 230, 230, 245, resumeHover ? 255 : 210);
+
+  // Quit button
+  const quitHover = desktop && pointInRect(mx, my, btnX, floorf(330.0 * s), btnW, floorf(40.0 * s));
+  if (desktop) bloom_draw_rect(btnX, floorf(330.0 * s), btnW, floorf(40.0 * s), 255, 255, 255, quitHover ? 55 : 22);
+  const quitLabel = L(TR_QUIT_MENU);
+  const quitW = mtext(quitLabel, btnSize);
+  dtext(quitLabel, floorf((sw - quitW) / 2.0), floorf(340.0 * s), btnSize, 230, 230, 245, quitHover ? 255 : 210);
 
   const instrSize = floorf(16.0 * s);
   if (MOBILE > 0.5) {
-    const iw = measureText("Tap to Resume or Quit", instrSize);
-    drawTextRgba("Tap to Resume or Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_PAUSE_TOUCH), instrSize);
+    dtext(L(TR_HINT_PAUSE_TOUCH), floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
-    const iw = measureText("A to Resume, Menu to Quit", instrSize);
-    drawTextRgba("A to Resume, Menu to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_PAUSE_TV), instrSize);
+    dtext(L(TR_HINT_PAUSE_TV), floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
   } else {
-    const iw = measureText("ESC to Resume, Q to Quit", instrSize);
-    drawTextRgba("ESC to Resume, Q to Quit", floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
+    const iw = mtext(L(TR_HINT_PAUSE_KB), instrSize);
+    dtext(L(TR_HINT_PAUSE_KB), floorf((sw - iw) / 2.0), floorf(400.0 * s), instrSize, 180, 180, 200, 180);
   }
 }
 
@@ -2017,25 +2189,25 @@ function drawGameOver(sw: number, sh: number): void {
   drawSkyGradient(sw, sh);
   bloom_draw_rect(0, 0, sw, sh, 0, 0, 30, 120);
   const headSize = floorf(48.0 * s);
-  const text = "GAME OVER";
-  const tw = measureText(text, headSize);
-  drawTextRgba(text, floorf((sw - tw) / 2.0), floorf(200.0 * s), headSize, 230, 60, 60, 255);
+  const text = L(TR_GAME_OVER);
+  const tw = mtext(text, headSize);
+  dtext(text, floorf((sw - tw) / 2.0), floorf(200.0 * s), headSize, 230, 60, 60, 255);
 
   const bodySize = floorf(24.0 * s);
-  const coinsText = "Coins: " + floorf(P[PI_COINS]).toString();
-  const cw = measureText(coinsText, bodySize);
-  drawTextRgba(coinsText, floorf((sw - cw) / 2.0), floorf(280.0 * s), bodySize, 255, 255, 255, 255);
+  const coinsText = (L(TR_COINS) + ": ") + floorf(P[PI_COINS]).toString();
+  const cw = mtext(coinsText, bodySize);
+  dtext(coinsText, floorf((sw - cw) / 2.0), floorf(280.0 * s), bodySize, 255, 255, 255, 255);
 
   const instrSize = floorf(20.0 * s);
   if (MOBILE > 0.5) {
-    const iw = measureText("Tap to continue", instrSize);
-    drawTextRgba("Tap to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
+    const iw = mtext(L(TR_HINT_CONT_TOUCH), instrSize);
+    dtext(L(TR_HINT_CONT_TOUCH), floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
   } else if (TV > 0.5) {
-    const iw = measureText("Press A to continue", instrSize);
-    drawTextRgba("Press A to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
+    const iw = mtext(L(TR_HINT_CONT_TV), instrSize);
+    dtext(L(TR_HINT_CONT_TV), floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
   } else {
-    const iw = measureText("Press ENTER to continue", instrSize);
-    drawTextRgba("Press ENTER to continue", floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
+    const iw = mtext(L(TR_HINT_CONT_KB), instrSize);
+    dtext(L(TR_HINT_CONT_KB), floorf((sw - iw) / 2.0), floorf(360.0 * s), instrSize, 200, 200, 220, 200);
   }
 }
 
@@ -2043,30 +2215,30 @@ function drawLevelCompleteScreen(t: number, sw: number, sh: number): void {
   const s = UI[UI_SCALE];
   bloom_draw_rect(0, 0, sw, sh, 0, 0, 0, 150);
   const headSize = floorf(42.0 * s);
-  const text = "LEVEL COMPLETE!";
-  const tw = measureText(text, headSize);
-  drawTextRgba(text, floorf((sw - tw) / 2.0), floorf(180.0 * s), headSize, 255, 255, 100, 255);
+  const text = L(TR_LEVEL_COMPLETE);
+  const tw = mtext(text, headSize);
+  dtext(text, floorf((sw - tw) / 2.0), floorf(180.0 * s), headSize, 255, 255, 100, 255);
 
   const bodySize = floorf(24.0 * s);
-  const coinsText = "Coins: " + floorf(P[PI_COINS]).toString();
-  const cw = measureText(coinsText, bodySize);
-  drawTextRgba(coinsText, floorf((sw - cw) / 2.0), floorf(260.0 * s), bodySize, 255, 255, 255, 255);
+  const coinsText = (L(TR_COINS) + ": ") + floorf(P[PI_COINS]).toString();
+  const cw = mtext(coinsText, bodySize);
+  dtext(coinsText, floorf((sw - cw) / 2.0), floorf(260.0 * s), bodySize, 255, 255, 255, 255);
 
   if (P[PI_GEMS] > 0.0) {
-    const gemText = "Gems: " + floorf(P[PI_GEMS]).toString();
-    const gw = measureText(gemText, bodySize);
-    drawTextRgba(gemText, floorf((sw - gw) / 2.0), floorf(300.0 * s), bodySize, 50, 150, 255, 255);
+    const gemText = (L(TR_GEMS) + ": ") + floorf(P[PI_GEMS]).toString();
+    const gw = mtext(gemText, bodySize);
+    dtext(gemText, floorf((sw - gw) / 2.0), floorf(300.0 * s), bodySize, 50, 150, 255, 255);
   }
 
   const instrSize = floorf(20.0 * s);
   if (MOBILE > 0.5) {
-    const iw = measureText("Tap to continue", instrSize);
-    drawTextRgba("Tap to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, 200, 200, 220, 200);
+    const iw = mtext(L(TR_HINT_CONT_TOUCH), instrSize);
+    dtext(L(TR_HINT_CONT_TOUCH), floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, 200, 200, 220, 200);
   } else if (TV > 0.5) {
-    const iw = measureText("Press A to continue", instrSize);
-    drawTextRgba("Press A to continue", floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, 200, 200, 220, 200);
+    const iw = mtext(L(TR_HINT_CONT_TV), instrSize);
+    dtext(L(TR_HINT_CONT_TV), floorf((sw - iw) / 2.0), floorf(380.0 * s), instrSize, 200, 200, 220, 200);
   } else {
-    drawTextRgba("Press ENTER to continue", floorf(sw / 2.0) - 120, 380, 20, 200, 200, 220, 200);
+    dtext(L(TR_HINT_CONT_KB), floorf(sw / 2.0) - 120, 380, 20, 200, 200, 220, 200);
   }
 }
 
@@ -2096,7 +2268,7 @@ function drawTouchControls(sw: number, sh: number): void {
   if (TCH[TI_JUMP_DOWN] > 0.5) jumpAlpha = 80;
   bloom_draw_circle(jumpX, jumpY, jumpR, 255, 255, 255, jumpAlpha);
   const jumpLabelSize = floorf(16.0 * s);
-  drawTextRgba("Jump", jumpX - floorf(20.0 * s), jumpY - floorf(8.0 * s), jumpLabelSize, 255, 255, 255, 150);
+  dtext(L(TR_JUMP), jumpX - floorf(20.0 * s), jumpY - floorf(8.0 * s), jumpLabelSize, 255, 255, 255, 150);
 
   // Pause button (top-right)
   const pauseS = floorf(TOUCH_PAUSE_SIZE * s * 0.75);
@@ -2141,6 +2313,10 @@ runGame((dt: number): void => {
   updateGamepadInput();
 
   const state = floorf(GS[GI_STATE]);
+
+  // Desktop-only: F11 toggles fullscreen (mobile/TV are already fullscreen).
+  // Checked here, above the state machine, so it works in every screen.
+  if (MOBILE < 0.5 && TV < 0.5 && isKeyPressed(K_F11)) toggleFullscreen();
 
   if (state === ST_MENU) {
     // === TITLE SCREEN ===
@@ -2216,6 +2392,20 @@ runGame((dt: number): void => {
           if (ty > 280.0 * ps && ty < 320.0 * ps) GS[GI_STATE] = ST_PLAYING;
           if (ty > 330.0 * ps && ty < 370.0 * ps) { GS[GI_STATE] = ST_MENU; GS[GI_SEL] = 0.0; switchMusic(1.0); }
         }
+      }
+    }
+    // Desktop: left-click Resume or Quit (regions match drawPauseScreen)
+    if (MOBILE < 0.5 && TV < 0.5 && isMouseButtonPressed(MB_LEFT)) {
+      const ps = UI[UI_SCALE];
+      const mbx = floorf(sw * 0.2);
+      const mbw = floorf(sw * 0.6);
+      const mpx = getMouseX();
+      const mpy = getMouseY();
+      if (pointInRect(mpx, mpy, mbx, floorf(280.0 * ps), mbw, floorf(40.0 * ps))) {
+        GS[GI_STATE] = ST_PLAYING;
+      }
+      if (pointInRect(mpx, mpy, mbx, floorf(330.0 * ps), mbw, floorf(40.0 * ps))) {
+        GS[GI_STATE] = ST_MENU; GS[GI_SEL] = 0.0; switchMusic(1.0);
       }
     }
 

@@ -25,3 +25,6 @@ bloom_web_shim.js
 bloom_jump_web.html
 .claude/
 .perry/
+.perry-cache/
+jump_cjk
+bloom_jump_tv
