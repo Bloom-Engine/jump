@@ -83,3 +83,9 @@ distribute = "github"
 # GUI game that renders its own window but doesn't import perry/ui, so force
 # the WINDOWS subsystem — otherwise Windows pops a console window alongside it.
 subsystem = "windows"
+# Authenticode code signing via Google Cloud KMS. In CI the cert + service
+# account files are written from secrets and `gcloud_kms_key` is injected by the
+# "Decode Windows signing credentials" step in release.yml. For local Windows
+# publishes, point these at your local copies + KMS key resource name.
+gcloud_kms_cert = "/tmp/win_codesign.crt"
+gcloud_service_account = "/tmp/win_kms_sa.json"

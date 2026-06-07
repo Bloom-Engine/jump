@@ -376,6 +376,22 @@ jobs:
           sed -i "s/^version = .*/version = \"$VERSION\"/" perry.toml
           sed -i "s/^build_number = .*/build_number = ${{ github.run_number }}/" perry.toml
 
+      - name: Decode Windows signing credentials
+        run: |
+          if [ -n "$WINDOWS_KMS_CERT_B64" ] && [ -n "$WINDOWS_KMS_SA_B64" ] && [ -n "$WINDOWS_KMS_KEY" ]; then
+            echo "$WINDOWS_KMS_CERT_B64" | base64 -d > /tmp/win_codesign.crt
+            echo "$WINDOWS_KMS_SA_B64" | base64 -d > /tmp/win_kms_sa.json
+            # Inject the KMS key resource name into [windows] (kept out of the repo)
+            sed -i '/^\[windows\]/a gcloud_kms_key = "'"$WINDOWS_KMS_KEY"'"' perry.toml
+            echo "Windows Google Cloud KMS code signing configured."
+          else
+            echo "::warning::Windows signing secrets (WINDOWS_KMS_CERT_B64 / WINDOWS_KMS_SA_B64 / WINDOWS_KMS_KEY) not set — the .exe will be UNSIGNED."
+          fi
+        env:
+          WINDOWS_KMS_CERT_B64: ${{ secrets.WINDOWS_KMS_CERT_B64 }}
+          WINDOWS_KMS_SA_B64: ${{ secrets.WINDOWS_KMS_SA_B64 }}
+          WINDOWS_KMS_KEY: ${{ secrets.WINDOWS_KMS_KEY }}
+
       - name: Build for Windows
         run: perry publish windows
 
