@@ -35,7 +35,10 @@ exclude = [
   "tvos-xcode",
   "watchos-xcode",
   "*.app",
-  "jump",
+  # NOTE: do not add a bare "jump" exclude — perry's tarball excludes match by
+  # name at ANY depth, so it also prunes android/app/src/main/java/com/bloomengine/jump/
+  # (the launcher Activity source), which breaks the published Android AAB. The
+  # root `jump` binary is already dropped by the extension-less >1MB rule.
   "editor",
   "bloom_jump",
   "bloom_jump_mac",
