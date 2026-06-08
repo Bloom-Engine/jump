@@ -78,6 +78,14 @@ encryption_exempt = true
 provisioning_profile = "/Users/amlug/.perry/com_bloomengine_jump_tvos.mobileprovision"
 signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
 
+[watchos]
+bundle_id = "com.bloom.jump"
+certificate = "/Users/amlug/.perry/distribution.p12"
+distribute = "testflight"
+encryption_exempt = true
+provisioning_profile = "/Users/amlug/.perry/com_bloom_jump_watchos.mobileprovision"
+signing_identity = "Apple Distribution: Skelpo GmbH (K6UW5YV9F7)"
+
 [windows]
 distribute = "github"
 # GUI game that renders its own window but doesn't import perry/ui, so force
