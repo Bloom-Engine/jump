@@ -3,11 +3,6 @@ distribute = "playstore"
 google_play_key = "/Users/amlug/projects/gscmaster.com/searchbird-483214-a77c096cd7bb.json"
 key_alias = "key0"
 keystore = "../jump.keystore"
-# Explicit Play versionCode (perry #4814). Must stay strictly greater than the
-# current Play high-water (800000, left by earlier build_number-based uploads).
-# Bump this above the last accepted code on each release; the marketing `version`
-# stays independent.
-version_code = 800001
 
 [build]
 opt_level = 2
