@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/main.ts",
   "dependencies": {
-    "@bloomengine/engine": "^0.4.14",
+    "@bloomengine/engine": "^0.4.15",
     "puppeteer-core": "^23.11.1"
   },
   "perry": {
