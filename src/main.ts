@@ -1023,20 +1023,34 @@ function discoverLevels(): void {
   // menu→Play click would otherwise grow the list because the .length=0
   // clear pattern is also broken (see comment above).
   if (LEVEL_FILES.length > 0) { GS[GI_LCOUNT] = LEVEL_FILES.length; return; }
-  for (let i = 1; i <= 10; i = i + 1) {
+  // Stop after 2 consecutive misses rather than probing the full range. On web
+  // `readFile` is a synchronous, main-thread XHR (see bloom_ffi.js) and every
+  // miss is a blocking 404 before the first frame paints; the old fixed scan
+  // fired 30 requests (25 of them 404s for level6-10 + custom_1-20). Levels and
+  // editor-created customs are contiguous, so a 2-miss tolerance keeps a single
+  // gap working while cutting the probe count dramatically.
+  let levelMisses = 0;
+  for (let i = 1; i <= 10 && levelMisses < 2; i = i + 1) {
     const path = "assets/levels/level" + i.toString() + ".txt";
     const data = readFile(path);
     if (data.length > 0) {
       LEVEL_FILES.push(path);
       LEVEL_NAMES.push((L(TR_LEVEL) + " ") + i.toString());
+      levelMisses = 0;
+    } else {
+      levelMisses = levelMisses + 1;
     }
   }
-  for (let i = 1; i <= 20; i = i + 1) {
+  let customMisses = 0;
+  for (let i = 1; i <= 20 && customMisses < 2; i = i + 1) {
     const path = "assets/levels/custom_" + i.toString() + ".txt";
     const data = readFile(path);
     if (data.length > 0) {
       LEVEL_FILES.push(path);
       LEVEL_NAMES.push((L(TR_CUSTOM) + " ") + i.toString());
+      customMisses = 0;
+    } else {
+      customMisses = customMisses + 1;
     }
   }
   GS[GI_LCOUNT] = LEVEL_FILES.length;

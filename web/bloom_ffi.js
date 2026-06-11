@@ -69,15 +69,44 @@ const keyMap = {
 
 // Only keyboard + gamepad are wired today — bloom_web has no mouse/touch inject FFI yet.
 // The jump game works with keyboard alone on desktop.
+//
+// Key events are QUEUED, not injected immediately, then drained once per frame in
+// `flushInput()` right before `bloom_begin_drawing()`. Browser key events fire
+// asynchronously, at any point in the frame; the engine computes the pressed edge
+// (`is_key_pressed` = down && !prev) in begin_frame and snapshots `prev = down` in
+// end_frame. If a keydown lands mid-frame (after begin_frame, before end_frame),
+// end_frame folds it into `prev` before any begin_frame sees the transition, so the
+// edge is lost and `isKeyPressed` never fires — every menu/level-select that polls
+// `isKeyPressed` goes dead while held-state (`isKeyDown`) still works. Draining at a
+// fixed point each frame makes the transition observable exactly once.
+const inputQueue = [];   // {down:bool, k:int} in arrival order
+const deferredUps = [];  // keyups held one frame so a same-frame tap stays down ≥1 frame
 function installInputListeners() {
   addEventListener("keydown", (e) => {
     const k = keyMap[e.code];
-    if (k !== undefined) { bloom.bloom_inject_key_down(k); e.preventDefault(); }
+    if (k !== undefined) { inputQueue.push({ down: true, k }); e.preventDefault(); }
   });
   addEventListener("keyup", (e) => {
     const k = keyMap[e.code];
-    if (k !== undefined) { bloom.bloom_inject_key_up(k); e.preventDefault(); }
+    if (k !== undefined) { inputQueue.push({ down: false, k }); e.preventDefault(); }
   });
+}
+
+// Apply one frame's worth of queued key transitions to the engine, in order.
+// A keyup whose keydown arrived in the SAME batch is deferred to next frame so the
+// key is "down" for at least one full frame — otherwise a sub-frame tap (down+up
+// before a single begin_frame) would cancel out and never register as pressed.
+function flushInput() {
+  for (let i = 0; i < deferredUps.length; i = i + 1) bloom.bloom_inject_key_up(deferredUps[i]);
+  deferredUps.length = 0;
+  const downThisFrame = new Set();
+  for (let i = 0; i < inputQueue.length; i = i + 1) {
+    const ev = inputQueue[i];
+    if (ev.down) { bloom.bloom_inject_key_down(ev.k); downThisFrame.add(ev.k); }
+    else if (downThisFrame.has(ev.k)) { deferredUps.push(ev.k); }
+    else { bloom.bloom_inject_key_up(ev.k); }
+  }
+  inputQueue.length = 0;
 }
 
 // ----- Audio bridge: pull samples from the Rust mixer into a Web Audio sink -----
@@ -233,6 +262,7 @@ function buildFfiImports() {
     const frame = () => {
       if (!running) return;
       try {
+        flushInput();   // apply queued key transitions before the engine computes the pressed-edge
         bloom.bloom_begin_drawing();
         call1(gameClosure, bloom.bloom_get_delta_time());
         bloom.bloom_end_drawing();
