@@ -1,0 +1,18 @@
+{
+  "_comment": "Localized marketing captions overlaid on each store screenshot. Keyed by language, then by raw screen file stem (01-title, 02-select, 03-play, 04-pause). Keep short — they render as one or two lines above the game card.",
+  "captions": {
+    "en": { "01-title": "Jump into 5 pixel worlds", "02-select": "Five hand-crafted levels", "03-play": "Run, jump & collect", "04-pause": "Play your way, anywhere" },
+    "de": { "01-title": "Spring in 5 Pixelwelten", "02-select": "Fünf handgemachte Level", "03-play": "Rennen, springen, sammeln", "04-pause": "Spiel überall, wie du willst" },
+    "es": { "01-title": "Salta a 5 mundos pixelados", "02-select": "Cinco niveles hechos a mano", "03-play": "Corre, salta y colecciona", "04-pause": "Juega a tu manera" },
+    "fr": { "01-title": "Saute dans 5 mondes pixel", "02-select": "Cinq niveaux faits main", "03-play": "Cours, saute, collecte", "04-pause": "Joue à ta façon, partout" },
+    "it": { "01-title": "Salta in 5 mondi pixel", "02-select": "Cinque livelli fatti a mano", "03-play": "Corri, salta, raccogli", "04-pause": "Gioca come vuoi, ovunque" },
+    "ja": { "01-title": "5つのドット世界へ", "02-select": "手作りの5ステージ", "03-play": "走って跳んで集めよう", "04-pause": "好きな操作でどこでも" },
+    "ko": { "01-title": "5개의 픽셀 월드로", "02-select": "손수 만든 5개 레벨", "03-play": "달리고 뛰고 모으기", "04-pause": "어디서나 원하는 방식으로" },
+    "pt": { "01-title": "Pule em 5 mundos pixel", "02-select": "Cinco fases feitas à mão", "03-play": "Corra, pule e colete", "04-pause": "Jogue do seu jeito" },
+    "th": { "01-title": "กระโดดสู่ 5 โลกพิกเซล", "02-select": "ห้าด่านสร้างด้วยมือ", "03-play": "วิ่ง กระโดด เก็บของ", "04-pause": "เล่นได้ทุกที่ในแบบคุณ" },
+    "tr": { "01-title": "5 piksel dünyaya atla", "02-select": "Elle yapılmış beş seviye", "03-play": "Koş, zıpla, topla", "04-pause": "İstediğin gibi, her yerde" },
+    "vi": { "01-title": "Nhảy vào 5 thế giới pixel", "02-select": "Năm màn chơi thủ công", "03-play": "Chạy, nhảy, thu thập", "04-pause": "Chơi theo cách của bạn" },
+    "id": { "01-title": "Lompat ke 5 dunia piksel", "02-select": "Lima level buatan tangan", "03-play": "Lari, lompat, kumpulkan", "04-pause": "Main sesukamu, di mana saja" },
+    "zh": { "01-title": "跳进 5 个像素世界", "02-select": "五个手工打造的关卡", "03-play": "奔跑、跳跃、收集", "04-pause": "随时随地，随心畅玩" }
+  }
+}

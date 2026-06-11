@@ -1,0 +1,180 @@
+{
+  "_meta": {
+    "comment": "Single source of truth for App Store + Google Play listing copy. Explode into fastlane structures with store/tools/build_metadata.py. Char limits: name<=30, subtitle<=30, keywords<=100, promo<=170, short_description<=80, description<=4000.",
+    "app_id_apple": "6761447092",
+    "package_name_google": "com.bloom.jump",
+    "languages_order": [
+      "en",
+      "de",
+      "es",
+      "fr",
+      "it",
+      "ja",
+      "ko",
+      "pt",
+      "th",
+      "tr",
+      "vi",
+      "id",
+      "zh"
+    ]
+  },
+  "languages": {
+    "en": {
+      "apple_locale": "en-US",
+      "google_locale": "en-US",
+      "nav_lang": "en-US",
+      "name": "Bloom Jump",
+      "subtitle": "Classic Pixel Platformer",
+      "keywords": "platformer,pixel,retro,arcade,jump,run,2d,sidescroller,coins,levels,classic,kids",
+      "promo": "Run, jump, and stomp through 5 hand-crafted pixel worlds. Collect coins and gems, dodge spikes, bounce off springs, and reach the flag!",
+      "short_description": "Run, jump & collect through 5 hand-crafted pixel-art platformer levels.",
+      "description": "Bloom Jump is a classic 2D side-scrolling platformer with crisp pixel-art worlds and tight, responsive controls — easy to pick up, fun to master.\n\nRun, jump, and stomp your way through five hand-designed levels: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves, and Final Heights. Collect coins and gems, bounce off springs, dodge spikes, and outsmart walkers, flyers, and chasers on your way to the flag.\n\nFEATURES\n• 5 hand-crafted levels with parallax pixel-art backgrounds\n• Smooth 60 FPS platforming with springs, one-way platforms, and stompable enemies\n• Coins, gems, and a flag goal in every level — three lives, three hearts\n• Original chiptune music and retro sound effects\n• Play your way: touch controls, game controller, or keyboard\n• Available in 13 languages\n\nPure, old-school platforming — no timers, no ads getting in your way. Just you, the jump button, and the next level. Grab your coins and reach the flag!",
+      "release_notes": "Initial release! 5 levels, 13 languages, and full support for touch, controller, and keyboard. Have fun jumping!"
+    },
+    "de": {
+      "apple_locale": "de-DE",
+      "google_locale": "de-DE",
+      "nav_lang": "de-DE",
+      "name": "Bloom Jump",
+      "subtitle": "Klassischer Pixel-Platformer",
+      "keywords": "jump and run,pixel,retro,arcade,springen,laufen,2d,plattform,münzen,level,klassisch",
+      "promo": "Renne, springe und hüpfe durch 5 handgemachte Pixelwelten. Sammle Münzen und Edelsteine, weiche Stacheln aus und erreiche die Flagge!",
+      "short_description": "Renne, springe & sammle durch 5 handgemachte Pixel-Plattform-Level.",
+      "description": "Bloom Jump ist ein klassisches 2D-Jump-’n’-Run mit gestochen scharfer Pixelgrafik und präziser, reaktionsschneller Steuerung — leicht zu lernen, herausfordernd zu meistern.\n\nRenne, springe und hüpfe durch fünf handgemachte Level: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves und Final Heights. Sammle Münzen und Edelsteine, federe auf Sprungfedern, weiche Stacheln aus und überliste Läufer, Flieger und Verfolger auf dem Weg zur Flagge.\n\nFUNKTIONEN\n• 5 handgemachte Level mit Parallax-Pixelhintergründen\n• Flüssiges Gameplay mit 60 FPS, Sprungfedern, Einweg-Plattformen und Gegnern zum Draufhüpfen\n• Münzen, Edelsteine und eine Zielflagge in jedem Level — drei Leben, drei Herzen\n• Original-Chiptune-Musik und Retro-Soundeffekte\n• Spiele wie du willst: Touch, Controller oder Tastatur\n• Verfügbar in 13 Sprachen\n\nPures Old-School-Jump-’n’-Run — keine Timer, keine Werbung. Nur du, die Sprungtaste und das nächste Level. Schnapp dir die Münzen und erreiche die Flagge!",
+      "release_notes": "Erste Veröffentlichung! 5 Level, 13 Sprachen und volle Unterstützung für Touch, Controller und Tastatur. Viel Spaß beim Springen!"
+    },
+    "es": {
+      "apple_locale": "es-ES",
+      "google_locale": "es-ES",
+      "nav_lang": "es-ES",
+      "name": "Bloom Jump",
+      "subtitle": "Plataformas pixel clásico",
+      "keywords": "plataformas,pixel,retro,arcade,saltar,correr,2d,monedas,niveles,clásico,niños",
+      "promo": "¡Corre, salta y rebota por 5 mundos pixelados hechos a mano. Reúne monedas y gemas, esquiva pinchos y llega a la bandera!",
+      "short_description": "¡Corre, salta y colecciona por 5 niveles de plataformas pixel-art!",
+      "description": "Bloom Jump es un clásico juego de plataformas 2D con nítidos mundos pixel-art y controles precisos y responsivos: fácil de aprender, divertido de dominar.\n\nCorre, salta y rebota por cinco niveles diseñados a mano: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves y Final Heights. Reúne monedas y gemas, rebota en resortes, esquiva pinchos y supera a caminantes, voladores y perseguidores camino a la bandera.\n\nCARACTERÍSTICAS\n• 5 niveles hechos a mano con fondos pixel-art en paralaje\n• Plataformas fluidas a 60 FPS con resortes, plataformas de un sentido y enemigos para saltar encima\n• Monedas, gemas y una bandera de meta en cada nivel — tres vidas, tres corazones\n• Música chiptune original y efectos de sonido retro\n• Juega a tu manera: controles táctiles, mando o teclado\n• Disponible en 13 idiomas\n\nPlataformas puras y clásicas — sin temporizadores ni anuncios. Solo tú, el botón de salto y el siguiente nivel. ¡Reúne tus monedas y llega a la bandera!",
+      "release_notes": "¡Lanzamiento inicial! 5 niveles, 13 idiomas y soporte completo para táctil, mando y teclado. ¡A saltar!"
+    },
+    "fr": {
+      "apple_locale": "fr-FR",
+      "google_locale": "fr-FR",
+      "nav_lang": "fr-FR",
+      "name": "Bloom Jump",
+      "subtitle": "Plateforme pixel classique",
+      "keywords": "plateforme,pixel,retro,arcade,sauter,courir,2d,pièces,niveaux,classique,enfants",
+      "promo": "Cours, saute et rebondis à travers 5 mondes pixelisés faits main. Récolte pièces et gemmes, évite les pics et atteins le drapeau !",
+      "short_description": "Cours, saute et collecte à travers 5 niveaux de plateforme pixel-art !",
+      "description": "Bloom Jump est un jeu de plateforme 2D classique aux mondes pixel-art nets et aux contrôles précis et réactifs — facile à prendre en main, plaisant à maîtriser.\n\nCours, saute et rebondis à travers cinq niveaux conçus à la main : Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves et Final Heights. Récolte pièces et gemmes, rebondis sur les ressorts, évite les pics et déjoue marcheurs, volants et poursuivants jusqu’au drapeau.\n\nFONCTIONNALITÉS\n• 5 niveaux faits main avec décors pixel-art en parallaxe\n• Plateforme fluide à 60 FPS avec ressorts, plateformes à sens unique et ennemis à écraser\n• Pièces, gemmes et un drapeau d’arrivée à chaque niveau — trois vies, trois cœurs\n• Musique chiptune originale et effets sonores rétro\n• Joue à ta façon : tactile, manette ou clavier\n• Disponible en 13 langues\n\nDe la plateforme pure et old-school — sans minuteur, sans publicité. Juste toi, le bouton de saut et le niveau suivant. Récupère tes pièces et atteins le drapeau !",
+      "release_notes": "Première version ! 5 niveaux, 13 langues et prise en charge complète du tactile, de la manette et du clavier. Bon saut !"
+    },
+    "it": {
+      "apple_locale": "it",
+      "google_locale": "it-IT",
+      "nav_lang": "it-IT",
+      "name": "Bloom Jump – Platformer",
+      "subtitle": "Platform pixel classico",
+      "keywords": "platform,pixel,retro,arcade,saltare,correre,2d,monete,livelli,classico,bambini",
+      "promo": "Corri, salta e rimbalza attraverso 5 mondi pixelati fatti a mano. Raccogli monete e gemme, schiva le spine e raggiungi la bandiera!",
+      "short_description": "Corri, salta e raccogli attraverso 5 livelli platform in pixel-art!",
+      "description": "Bloom Jump è un classico platform 2D a scorrimento con nitidi mondi in pixel-art e controlli precisi e reattivi: facile da imparare, divertente da padroneggiare.\n\nCorri, salta e rimbalza attraverso cinque livelli disegnati a mano: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves e Final Heights. Raccogli monete e gemme, rimbalza sulle molle, schiva le spine e supera camminatori, volanti e inseguitori fino alla bandiera.\n\nCARATTERISTICHE\n• 5 livelli fatti a mano con sfondi pixel-art in parallasse\n• Platform fluido a 60 FPS con molle, piattaforme a senso unico e nemici da schiacciare\n• Monete, gemme e una bandiera traguardo in ogni livello — tre vite, tre cuori\n• Musica chiptune originale ed effetti sonori retro\n• Gioca come vuoi: comandi touch, controller o tastiera\n• Disponibile in 13 lingue\n\nPlatform puro e vecchio stile — niente timer, niente pubblicità. Solo tu, il pulsante di salto e il livello successivo. Raccogli le monete e raggiungi la bandiera!",
+      "release_notes": "Primo rilascio! 5 livelli, 13 lingue e pieno supporto per touch, controller e tastiera. Buon salto!"
+    },
+    "ja": {
+      "apple_locale": "ja",
+      "google_locale": "ja-JP",
+      "nav_lang": "ja-JP",
+      "name": "Bloom Jump",
+      "subtitle": "クラシックなドット横スクロール",
+      "keywords": "アクション,ドット,レトロ,ジャンプ,横スクロール,2d,プラットフォーマー,コイン,アーケード,子供",
+      "promo": "手作りの5つのドット絵ワールドを走り、跳び、踏みつけよう。コインとジェムを集め、トゲをよけ、ゴールの旗を目指せ！",
+      "short_description": "手作りの5ステージを走って跳んで集める、ドット絵アクション！",
+      "description": "Bloom Jump は、くっきりとしたドット絵の世界と、軽快で反応の良い操作が魅力のクラシックな2D横スクロールアクション。すぐに遊べて、極めるほど楽しい。\n\n手作りの5つのステージ「Green Meadows」「Rocky Cliffs」「Sky Gardens」「Dark Caves」「Final Heights」を、走って跳んで踏みつけて進もう。コインとジェムを集め、バネで弾み、トゲをよけ、歩く敵・飛ぶ敵・追う敵をかわしてゴールの旗を目指そう。\n\n特徴\n• パララックスのドット絵背景を持つ手作りの5ステージ\n• バネ・すり抜け床・踏める敵を備えた、なめらかな60FPSのアクション\n• 各ステージにコイン・ジェム・ゴールの旗 — ライフ3、ハート3\n• オリジナルのチップチューン音楽とレトロな効果音\n• 好きな操作で: タッチ、コントローラー、キーボード\n• 13言語に対応\n\n純粋で懐かしいアクション — タイマーも広告もなし。あるのは君とジャンプボタン、そして次のステージだけ。コインを集めて旗を目指せ！",
+      "release_notes": "初回リリース！5ステージ、13言語、タッチ・コントローラー・キーボードに完全対応。思いきり跳ねて楽しもう！"
+    },
+    "ko": {
+      "apple_locale": "ko",
+      "google_locale": "ko-KR",
+      "nav_lang": "ko-KR",
+      "name": "Bloom Jump",
+      "subtitle": "클래식 픽셀 플랫포머",
+      "keywords": "플랫포머,픽셀,레트로,아케이드,점프,달리기,2d,횡스크롤,코인,레벨,클래식",
+      "promo": "손수 만든 5개의 픽셀 월드를 달리고, 뛰고, 밟아라. 코인과 보석을 모으고 가시를 피해 깃발에 도달하세요!",
+      "short_description": "손수 만든 5개 픽셀아트 플랫포머 레벨을 달리고 뛰고 모으세요!",
+      "description": "Bloom Jump은 선명한 픽셀아트 월드와 정확하고 반응성 좋은 조작이 돋보이는 클래식 2D 횡스크롤 플랫포머입니다. 쉽게 배우고, 깊이 있게 즐기세요.\n\n손수 디자인한 다섯 개의 레벨 Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves, Final Heights를 달리고 뛰고 밟으며 나아가세요. 코인과 보석을 모으고, 스프링으로 튀어 오르고, 가시를 피하고, 걷는 적·나는 적·추격하는 적을 따돌리며 깃발에 도달하세요.\n\n주요 기능\n• 패럴랙스 픽셀아트 배경을 갖춘 손수 만든 5개 레벨\n• 스프링, 일방통행 발판, 밟을 수 있는 적이 있는 부드러운 60FPS 플랫포밍\n• 모든 레벨의 코인·보석·목표 깃발 — 생명 3개, 하트 3개\n• 오리지널 칩튠 음악과 레트로 효과음\n• 원하는 방식으로: 터치, 컨트롤러, 키보드\n• 13개 언어 지원\n\n순수하고 클래식한 플랫포밍 — 타이머도, 광고도 없습니다. 오직 당신과 점프 버튼, 그리고 다음 레벨뿐. 코인을 모아 깃발에 도달하세요!",
+      "release_notes": "첫 출시! 5개 레벨, 13개 언어, 터치·컨트롤러·키보드 완전 지원. 신나게 점프하세요!"
+    },
+    "pt": {
+      "apple_locale": "pt-BR",
+      "google_locale": "pt-BR",
+      "nav_lang": "pt-BR",
+      "name": "Bloom Jump",
+      "subtitle": "Plataforma pixel clássico",
+      "keywords": "plataforma,pixel,retro,arcade,pular,correr,2d,moedas,fases,clássico,crianças",
+      "promo": "Corra, pule e quique por 5 mundos em pixel feitos à mão. Junte moedas e gemas, desvie de espinhos e alcance a bandeira!",
+      "short_description": "Corra, pule e colete por 5 fases de plataforma em pixel art!",
+      "description": "Bloom Jump é um clássico jogo de plataforma 2D com mundos nítidos em pixel art e controles precisos e responsivos — fácil de aprender, divertido de dominar.\n\nCorra, pule e quique por cinco fases feitas à mão: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves e Final Heights. Junte moedas e gemas, salte nas molas, desvie de espinhos e supere andarilhos, voadores e perseguidores até a bandeira.\n\nRECURSOS\n• 5 fases feitas à mão com fundos em pixel art com parallax\n• Plataforma fluida a 60 FPS com molas, plataformas de mão única e inimigos para pisar\n• Moedas, gemas e uma bandeira de chegada em cada fase — três vidas, três corações\n• Música chiptune original e efeitos sonoros retrô\n• Jogue do seu jeito: toque, controle ou teclado\n• Disponível em 13 idiomas\n\nPlataforma pura e old-school — sem cronômetros, sem anúncios. Só você, o botão de pulo e a próxima fase. Junte suas moedas e alcance a bandeira!",
+      "release_notes": "Lançamento inicial! 5 fases, 13 idiomas e suporte completo a toque, controle e teclado. Bom salto!"
+    },
+    "th": {
+      "apple_locale": "th",
+      "google_locale": "th",
+      "nav_lang": "th-TH",
+      "name": "Bloom Jump",
+      "subtitle": "เกมแพลตฟอร์มพิกเซลคลาสสิก",
+      "keywords": "แพลตฟอร์ม,พิกเซล,เรโทร,อาร์เคด,กระโดด,วิ่ง,2d,เหรียญ,ด่าน,คลาสสิก,เด็ก",
+      "promo": "วิ่ง กระโดด และเหยียบผ่าน 5 โลกพิกเซลที่สร้างด้วยมือ เก็บเหรียญและอัญมณี หลบหนาม แล้วไปให้ถึงธง!",
+      "short_description": "วิ่ง กระโดด และเก็บของผ่าน 5 ด่านแพลตฟอร์มสไตล์พิกเซล!",
+      "description": "Bloom Jump คือเกมแพลตฟอร์มเลื่อนด้านข้าง 2 มิติแบบคลาสสิก ที่มาพร้อมโลกพิกเซลอาร์ตคมชัดและการควบคุมที่แม่นยำตอบสนองไว เล่นง่ายแต่ท้าทายให้เชี่ยวชาญ\n\nวิ่ง กระโดด และเหยียบผ่านห้าด่านที่ออกแบบด้วยมือ ได้แก่ Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves และ Final Heights เก็บเหรียญและอัญมณี เด้งบนสปริง หลบหนาม และเอาชนะศัตรูที่เดิน บิน และไล่ตาม เพื่อไปให้ถึงธง\n\nคุณสมบัติ\n• 5 ด่านที่สร้างด้วยมือพร้อมฉากหลังพิกเซลอาร์ตแบบพารัลแลกซ์\n• การเล่นที่ลื่นไหล 60 FPS พร้อมสปริง แพลตฟอร์มทางเดียว และศัตรูที่เหยียบได้\n• เหรียญ อัญมณี และธงเป้าหมายในทุกด่าน — สามชีวิต สามหัวใจ\n• เพลงชิปทูนต้นฉบับและเสียงเอฟเฟกต์สไตล์เรโทร\n• เล่นในแบบของคุณ: สัมผัส จอย หรือคีย์บอร์ด\n• รองรับ 13 ภาษา\n\nแพลตฟอร์มแท้ ๆ สไตล์ดั้งเดิม — ไม่มีตัวจับเวลา ไม่มีโฆษณา มีแค่คุณ ปุ่มกระโดด และด่านถัดไป เก็บเหรียญแล้วไปให้ถึงธง!",
+      "release_notes": "เปิดตัวครั้งแรก! 5 ด่าน 13 ภาษา รองรับการสัมผัส จอย และคีย์บอร์ดเต็มรูปแบบ ขอให้สนุกกับการกระโดด!"
+    },
+    "tr": {
+      "apple_locale": "tr",
+      "google_locale": "tr-TR",
+      "nav_lang": "tr-TR",
+      "name": "Bloom Jump",
+      "subtitle": "Klasik Piksel Platform Oyunu",
+      "keywords": "platform,piksel,retro,arcade,zıpla,koş,2d,para,seviye,klasik,çocuk",
+      "promo": "Elle yapılmış 5 piksel dünyada koş, zıpla ve düşmanlara basarak ilerle. Para ve mücevher topla, dikenlerden kaç, bayrağa ulaş!",
+      "short_description": "Elle yapılmış 5 piksel platform seviyesinde koş, zıpla ve topla!",
+      "description": "Bloom Jump, net piksel sanatı dünyaları ve hassas, tepkisel kontrolleriyle klasik bir 2D yandan kaydırmalı platform oyunu — öğrenmesi kolay, ustalaşması keyifli.\n\nElle tasarlanmış beş seviyede koş, zıpla ve düşmanlara basarak ilerle: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves ve Final Heights. Para ve mücevher topla, yaylarda zıpla, dikenlerden kaç ve yürüyen, uçan ve takip eden düşmanları atlatarak bayrağa ulaş.\n\nÖZELLİKLER\n• Paralaks piksel sanatı arka planlı, elle yapılmış 5 seviye\n• Yaylar, tek yönlü platformlar ve üzerine basılabilen düşmanlarla akıcı 60 FPS platform oyunu\n• Her seviyede para, mücevher ve bir bitiş bayrağı — üç can, üç kalp\n• Özgün chiptune müzik ve retro ses efektleri\n• İstediğin gibi oyna: dokunmatik, oyun kumandası veya klavye\n• 13 dilde mevcut\n\nKatıksız, eski usul platform oyunu — sayaç yok, reklam yok. Sadece sen, zıplama düğmesi ve sıradaki seviye. Paralarını topla ve bayrağa ulaş!",
+      "release_notes": "İlk sürüm! 5 seviye, 13 dil ve dokunmatik, kumanda ve klavye için tam destek. İyi zıplamalar!"
+    },
+    "vi": {
+      "apple_locale": "vi",
+      "google_locale": "vi",
+      "nav_lang": "vi-VN",
+      "name": "Bloom Jump",
+      "subtitle": "Game đi cảnh pixel cổ điển",
+      "keywords": "đi cảnh,pixel,retro,arcade,nhảy,chạy,2d,xu,màn chơi,cổ điển,trẻ em",
+      "promo": "Chạy, nhảy và giẫm qua 5 thế giới pixel làm thủ công. Nhặt xu và ngọc, né gai, bật lò xo và chạm tới lá cờ!",
+      "short_description": "Chạy, nhảy và thu thập qua 5 màn chơi đi cảnh pixel thủ công!",
+      "description": "Bloom Jump là game đi cảnh 2D cổ điển với thế giới pixel sắc nét cùng điều khiển chính xác, nhạy bén — dễ chơi, vui khi thành thạo.\n\nChạy, nhảy và giẫm qua năm màn chơi thiết kế thủ công: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves và Final Heights. Nhặt xu và ngọc, bật trên lò xo, né gai và vượt qua kẻ đi bộ, kẻ bay và kẻ truy đuổi để chạm tới lá cờ.\n\nTÍNH NĂNG\n• 5 màn chơi thủ công với nền pixel-art chuyển động thị sai\n• Lối chơi mượt 60 FPS với lò xo, bệ một chiều và kẻ địch có thể giẫm\n• Xu, ngọc và lá cờ đích ở mỗi màn — ba mạng, ba trái tim\n• Nhạc chiptune nguyên bản và hiệu ứng âm thanh retro\n• Chơi theo cách của bạn: cảm ứng, tay cầm hoặc bàn phím\n• Hỗ trợ 13 ngôn ngữ\n\nĐi cảnh thuần túy, kiểu cổ điển — không đồng hồ đếm giờ, không quảng cáo. Chỉ có bạn, nút nhảy và màn chơi tiếp theo. Nhặt xu và chạm tới lá cờ!",
+      "release_notes": "Phát hành lần đầu! 5 màn chơi, 13 ngôn ngữ và hỗ trợ đầy đủ cảm ứng, tay cầm và bàn phím. Chúc nhảy vui!"
+    },
+    "id": {
+      "apple_locale": "id",
+      "google_locale": "id",
+      "nav_lang": "id-ID",
+      "name": "Bloom Jump",
+      "subtitle": "Platformer Piksel Klasik",
+      "keywords": "platformer,piksel,retro,arcade,lompat,lari,2d,koin,level,klasik,anak",
+      "promo": "Berlari, lompat, dan injak melewati 5 dunia piksel buatan tangan. Kumpulkan koin dan permata, hindari duri, dan capai bendera!",
+      "short_description": "Berlari, lompat & kumpulkan melewati 5 level platformer piksel!",
+      "description": "Bloom Jump adalah platformer 2D gulir-samping klasik dengan dunia pixel-art yang tajam serta kontrol presisi dan responsif — mudah dimainkan, seru untuk dikuasai.\n\nBerlari, lompat, dan injak melewati lima level buatan tangan: Green Meadows, Rocky Cliffs, Sky Gardens, Dark Caves, dan Final Heights. Kumpulkan koin dan permata, memantul di pegas, hindari duri, dan kalahkan musuh pejalan, terbang, dan pengejar menuju bendera.\n\nFITUR\n• 5 level buatan tangan dengan latar pixel-art paralaks\n• Permainan mulus 60 FPS dengan pegas, platform satu arah, dan musuh yang bisa diinjak\n• Koin, permata, dan bendera tujuan di setiap level — tiga nyawa, tiga hati\n• Musik chiptune orisinal dan efek suara retro\n• Mainkan sesukamu: kontrol sentuh, gamepad, atau keyboard\n• Tersedia dalam 13 bahasa\n\nPlatformer murni ala lawas — tanpa pengatur waktu, tanpa iklan. Hanya kamu, tombol lompat, dan level berikutnya. Kumpulkan koinmu dan capai bendera!",
+      "release_notes": "Rilis perdana! 5 level, 13 bahasa, dan dukungan penuh untuk sentuh, gamepad, dan keyboard. Selamat melompat!"
+    },
+    "zh": {
+      "apple_locale": "zh-Hans",
+      "google_locale": "zh-CN",
+      "nav_lang": "zh-Hans",
+      "name": "Bloom Jump",
+      "subtitle": "经典像素平台跳跃",
+      "keywords": "平台,像素,复古,街机,跳跃,跑酷,2d,横版,金币,关卡,经典,儿童",
+      "promo": "在 5 个手工打造的像素世界里奔跑、跳跃、踩踏。收集金币和宝石，躲开尖刺，弹上弹簧，抵达终点旗！",
+      "short_description": "在 5 个手工打造的像素平台关卡中奔跑、跳跃、收集！",
+      "description": "Bloom Jump 是一款经典的 2D 横版平台跳跃游戏，拥有清爽的像素美术世界和精准灵敏的操控——上手简单，精通有趣。\n\n奔跑、跳跃、踩踏，穿越五个手工设计的关卡：Green Meadows、Rocky Cliffs、Sky Gardens、Dark Caves 和 Final Heights。收集金币和宝石，借弹簧弹跳，躲开尖刺，智取行走、飞行与追逐的敌人，一路抵达终点旗。\n\n特色\n• 5 个手工打造的关卡，配有视差像素美术背景\n• 流畅的 60 FPS 平台体验，含弹簧、单向平台和可踩踏的敌人\n• 每关都有金币、宝石和终点旗——三条命，三颗心\n• 原创芯片音乐和复古音效\n• 随心操控：触屏、手柄或键盘\n• 支持 13 种语言\n\n纯粹的老派平台跳跃——没有计时，没有广告。只有你、跳跃键和下一关。收集金币，抵达终点旗！",
+      "release_notes": "首次发布！5 个关卡、13 种语言，全面支持触屏、手柄和键盘。尽情跳跃吧！"
+    }
+  }
+}

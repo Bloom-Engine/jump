@@ -71,6 +71,12 @@ if (PLATF[0] > 1.5 && PLATF[0] < 2.5) PLATF[1] = 1.0;  // iOS
 if (PLATF[0] > 4.5 && PLATF[0] < 5.5) PLATF[1] = 1.0;  // Android
 if (PLATF[0] > 5.5 && PLATF[0] < 6.5) PLATF[2] = 1.0;  // tvOS
 if (PLATF[0] > 7.5 && PLATF[0] < 8.5) PLATF[3] = 1.0;  // watchOS
+// Store-screenshot capture: force the mobile UI (touch controls + mobile layout)
+// regardless of host platform. Off in the shipping build; flipped on by
+// store/tools/build_capture.sh --mobile. Rendering is identical to a real device
+// (same code path) — only platform detection differs.
+const CAPTURE_MOBILE = false;
+if (CAPTURE_MOBILE) { PLATF[1] = 1.0; PLATF[2] = 0.0; PLATF[3] = 0.0; }
 const MOBILE = PLATF[1];
 const TV = PLATF[2];
 const WATCH = PLATF[3];
@@ -354,7 +360,11 @@ const LEVEL_FILES: string[] = [];
 // INITIALIZATION
 // ============================================================
 
-initWindow(SCREEN_W, SCREEN_H, "Bloom Jump", false);
+// Mobile-landscape capture uses a phone-aspect window (~19.5:9) so the touch
+// controls and UI scale match a real device; otherwise the normal desktop window.
+const CAP_W = CAPTURE_MOBILE ? 1392.0 : SCREEN_W;
+const CAP_H = CAPTURE_MOBILE ? 642.0 : SCREEN_H;
+initWindow(CAP_W, CAP_H, "Bloom Jump", false);
 setTargetFPS(60);
 // Pure-2D game — take the direct-to-swapchain path in the engine and
 // skip the deferred 3D pipeline entirely. On Android Adreno 618 this is
@@ -1487,8 +1497,15 @@ function drawCollectibles(t: number): void {
 // ============================================================
 
 function updateCamera(dt: number, sw: number, sh: number): void {
-  // Set zoom to UI scale so game world fills the screen proportionally
-  CAM[2] = UI[UI_SCALE];
+  // Set zoom to UI scale so game world fills the screen proportionally.
+  // On the watch the UI scale (~0.33) zooms the world out so far the player
+  // is a speck against mostly sky — pick a zoom that frames ~7 tiles across
+  // so the character and nearby ground fill the tiny screen.
+  if (WATCH > 0.5) {
+    CAM[2] = sw / (7.0 * TILE_SIZE);
+  } else {
+    CAM[2] = UI[UI_SCALE];
+  }
 
   const lookAhead = P[PI_FACE] > 0.5 ? 60.0 : -60.0;
   const targetX = P[PI_X] + TILE_SIZE * 0.5 + lookAhead;
@@ -2292,8 +2309,36 @@ switchMusic(1.0);
 // runGame dispatches per platform: rAF-driven on web (bloom_run_game hook),
 // blocking while-loop on native. The callback receives dt; beginDrawing/
 // endDrawing are done by runGame itself, so we don't call them in here.
+// ============================================================
+// SCREENSHOT CAPTURE MODE (App Store / Play Store asset generation)
+// Off in the shipping build. store/tools/build_capture.sh flips this to true and
+// compiles a throwaway binary; store/tools/capture_window.py runs it once per
+// language (language from -AppleLanguages) and grabs the window with macOS
+// screencapture at the end of each hold. This controller only *navigates* —
+// title → level select → gameplay → pause — on a wall-clock timer so the
+// external driver can sync to each screen. (The engine's bloom_take_screenshot
+// only writes from the deferred render path, so we don't rely on it here.)
+// ============================================================
+const CAPTURE_MODE = false;
+const CAP = [0.0, -1.0]; // [phaseStartTime(sec), phase] — phase -1 = not started
+const CAP_HOLD = 3.0;    // seconds to hold each screen before advancing
+function captureStep(): void {
+  const ct = getTime();
+  if (CAP[1] < -0.5) { CAP[1] = 0.0; CAP[0] = ct; GS[GI_STATE] = ST_MENU; }
+  if (ct - CAP[0] >= CAP_HOLD) {
+    CAP[1] = CAP[1] + 1.0;
+    CAP[0] = ct;
+    const np = floorf(CAP[1]);
+    if (np === 1.0) { discoverLevels(); GS[GI_STATE] = ST_LEVEL_SELECT; GS[GI_SEL] = 0.0; }
+    else if (np === 2.0) { discoverLevels(); startLevel(0); GS[GI_STATE] = ST_PLAYING; }
+    else if (np === 3.0) { GS[GI_STATE] = ST_PAUSED; }
+    // np >= 4: stay on the pause screen; the driver captures, then kills us.
+  }
+}
+
 runGame((dt: number): void => {
   const t = getTime();
+  if (CAPTURE_MODE) captureStep();
 
   // Dynamic screen size (mobile fills device screen, desktop uses SCREEN_W/SCREEN_H)
   const sw = getScreenWidth();

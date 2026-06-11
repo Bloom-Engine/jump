@@ -44,6 +44,14 @@ else
   echo "[1/4] Skipping bloom_web build (--skip-bloom)"
 fi
 
+# Newer Perry (0.5.x) rejects the engine's web native-library target unless it
+# declares `crate`+`lib` or `prebuilt`; the published engine ships the old
+# `crate`/`output` schema, so an unpatched `perry compile --target web` fails
+# with "crate and lib must be declared together". Patch the (gitignored)
+# node_modules manifest in place — the file perry actually reads — before
+# compiling. Idempotent; node_modules is rebuilt by `npm ci`, never committed.
+node "$JUMP_DIR/store/tools/patch_engine_web.js"
+
 echo "[2/4] Compiling game WASM (perry --target web)..."
 rm -rf "$OUT"
 mkdir -p "$OUT"

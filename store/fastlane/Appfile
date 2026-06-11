@@ -1,0 +1,9 @@
+# Shared identifiers for deliver (Apple App Store) and supply (Google Play).
+app_identifier("com.bloom.jump")
+apple_id("ralph2@skelpo.com")
+team_id("K6UW5YV9F7")           # Skelpo GmbH
+
+for_platform :android do
+  package_name("com.bloom.jump")
+  json_key_file("/Users/amlug/projects/gscmaster.com/searchbird-483214-a77c096cd7bb.json")
+end

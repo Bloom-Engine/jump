@@ -28,3 +28,18 @@ bloom_jump_web.html
 .perry-cache/
 jump_cjk
 bloom_jump_tv
+
+# Store launch assets — generated/binary outputs (regenerate via store/tools).
+# Tracked: source.json, captions.json, tools/, fastlane Appfile/Fastfile.
+store/tools/capture_bin
+store/tools/capture_bin_mobile
+store/tools/assets/
+store/screenshots/raw/
+store/screenshots/raw_mobile/
+store/screenshots/out/
+store/fastlane/screenshots/
+store/fastlane/metadata/
+store/fastlane/report.xml
+__pycache__/
+*.pyc
+cap_0*.png

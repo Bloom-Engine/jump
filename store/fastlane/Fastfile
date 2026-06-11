@@ -1,0 +1,112 @@
+# Bloom Jump — store listing automation.
+#
+# Pushes localized metadata + framed screenshots to both stores. No binary is
+# uploaded here (builds ship via `perry publish`). Apple uploads one platform at
+# a time (deliver detects device by image size), so there's a lane per platform.
+#
+# Run from the store/ directory:
+#   cd store
+#   fastlane ios      metadata   # App Store: iPhone + iPad
+#   fastlane mac      metadata   # Mac App Store
+#   fastlane tv       metadata   # Apple TV
+#   fastlane apple    all        # all three Apple platforms in sequence
+#   fastlane android  metadata   # Google Play  (add dry_run:true to validate only)
+
+# Absolute paths anchored to this Fastfile so they resolve regardless of fastlane's cwd.
+META_DIR  = File.expand_path("metadata", __dir__)
+SHOTS_DIR = File.expand_path("screenshots", __dir__)
+
+ASC_KEY_ID    = "MPJ792KV5Z"
+ASC_ISSUER_ID = "69a6de6f-e591-47e3-e053-5b8c7c11a4d1"
+ASC_KEY_PATH  = File.expand_path("~/.perry/AuthKey_MPJ792KV5Z.p8")
+APP_ID        = "com.bloom.jump"
+
+def asc_key
+  app_store_connect_api_key(
+    key_id: ASC_KEY_ID, issuer_id: ASC_ISSUER_ID, key_filepath: ASC_KEY_PATH,
+  )
+end
+
+# Shared deliver options for a given Apple platform + its screenshot folder.
+def push_apple(platform, shots, opts)
+  deliver(
+    api_key: asc_key,
+    app_identifier: APP_ID,
+    platform: platform,
+    metadata_path: META_DIR,
+    screenshots_path: shots,
+    skip_binary_upload: true,
+    skip_metadata: opts[:shots_only] ? true : false,
+    skip_screenshots: opts[:text_only] ? true : false,
+    overwrite_screenshots: true,
+    run_precheck_before_submit: false,
+    submit_for_review: false,
+    automatic_release: false,
+    force: true,                      # no interactive HTML confirmation
+    precheck_include_in_app_purchases: false,
+  )
+end
+
+platform :ios do
+  desc "App Store (iPhone + iPad): metadata + screenshots, all 13 languages."
+  lane :metadata do |o|
+    push_apple("ios", File.join(SHOTS_DIR,"ios"), o)
+  end
+end
+
+platform :mac do
+  desc "Mac App Store: metadata + screenshots, all 13 languages."
+  lane :metadata do |o|
+    push_apple("osx", File.join(SHOTS_DIR,"osx"), o)
+  end
+end
+
+platform :tv do
+  desc "Apple TV: metadata + screenshots, all 13 languages."
+  lane :metadata do |o|
+    push_apple("tvos", File.join(SHOTS_DIR,"tvos"), o)
+  end
+end
+
+platform :apple do
+  desc "All three Apple platforms in sequence."
+  lane :all do |o|
+    push_apple("ios", File.join(SHOTS_DIR,"ios"), o)
+    push_apple("osx", File.join(SHOTS_DIR,"osx"), o)
+    push_apple("tvos", File.join(SHOTS_DIR,"tvos"), o)
+  end
+end
+
+platform :android do
+  desc "Google Play: listing + screenshots, all 13 languages. dry_run:true validates."
+  lane :metadata do |o|
+    supply(
+      package_name: APP_ID,
+      json_key: "/Users/amlug/projects/gscmaster.com/searchbird-483214-a77c096cd7bb.json",
+      metadata_path: File.join(META_DIR,"android"),
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+      skip_upload_changelogs: true,
+      track: "production",
+      validate_only: o[:dry_run] ? true : false,
+    )
+  end
+end
+
+platform :apple do
+  desc "Upload ONLY Italian screenshots (added after the it name fix), leaving others intact."
+  lane :it_only do
+    { "ios" => "ios", "osx" => "osx", "tvos" => "tvos" }.each do |folder, plat|
+      deliver(
+        api_key: asc_key, app_identifier: APP_ID, platform: plat,
+        screenshots_path: File.join(__dir__, "_itshots", folder),
+        skip_binary_upload: true, skip_metadata: true,
+        overwrite_screenshots: false, run_precheck_before_submit: false,
+        submit_for_review: false, automatic_release: false, force: true,
+      )
+    end
+  end
+end
