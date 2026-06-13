@@ -293,7 +293,7 @@ const icon64 = generateIcon64();
 const icon1024 = upscaleNN(icon64, SCALE);
 
 // Save master icon
-savePNG(icon1024, 'assets/icon.png');
+savePNG(icon1024, 'assets-src/icons/icon.png');
 
 // ── Helper: get icon image at any pixel size ──
 function iconAtSize(sz) {
@@ -308,16 +308,16 @@ function iconAtSize(sz) {
 // ── macOS .iconset (for iconutil → .icns) ──
 // macOS expects: icon_{N}x{N}.png at NxN and icon_{N}x{N}@2x.png at 2Nx2N
 const macPairs = [16, 32, 128, 256, 512]; // each gets 1x and 2x
-ensureDir(path.join(ROOT, 'assets/icon.iconset'));
+ensureDir(path.join(ROOT, 'assets-src/icons/icon.iconset'));
 for (const sz of macPairs) {
-  savePNG(iconAtSize(sz), `assets/icon.iconset/icon_${sz}x${sz}.png`);
-  savePNG(iconAtSize(sz * 2), `assets/icon.iconset/icon_${sz}x${sz}@2x.png`);
+  savePNG(iconAtSize(sz), `assets-src/icons/icon.iconset/icon_${sz}x${sz}.png`);
+  savePNG(iconAtSize(sz * 2), `assets-src/icons/icon.iconset/icon_${sz}x${sz}@2x.png`);
 }
 
 // ── iOS sizes ──
 const iosSizes = [20, 29, 40, 58, 60, 76, 80, 87, 120, 152, 167, 180, 1024];
 for (const sz of iosSizes) {
-  savePNG(iconAtSize(sz), `assets/icons/ios/icon_${sz}x${sz}.png`);
+  savePNG(iconAtSize(sz), `assets-src/icons/ios/icon_${sz}x${sz}.png`);
 }
 
 // ── Android mipmap sizes ──
@@ -335,9 +335,9 @@ for (const [density, sz] of androidSizes) {
 // ── tvOS sizes ──
 const tvosSizes = [400, 800, 1280];
 for (const sz of tvosSizes) {
-  savePNG(iconAtSize(sz), `assets/icons/tvos/icon_${sz}x${sz}.png`);
+  savePNG(iconAtSize(sz), `assets-src/icons/tvos/icon_${sz}x${sz}.png`);
 }
 
 console.log('\nDone! Generated all icon sizes.');
 console.log('\nTo generate macOS .icns file:');
-console.log('  iconutil -c icns assets/icon.iconset -o assets/icon.icns');
+console.log('  iconutil -c icns assets-src/icons/icon.iconset -o assets-src/icons/icon.icns');

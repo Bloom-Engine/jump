@@ -122,7 +122,8 @@ const TR_SELECT_LEVEL: string[] = ["SELECT LEVEL", "LEVEL WÄHLEN", "ELEGIR NIVE
 const TR_BACK: string[] = ["< Back", "< Zurück", "< Atrás", "< Retour", "< Indietro", "< 戻る", "< 뒤로", "< Voltar", "< กลับ", "< Geri", "< Quay lại", "< Kembali", "< 返回"];
 const TR_HINT_LS_KB: string[] = ["Click or ENTER to play, ESC / Back to return", "Klick oder ENTER spielen, ESC / Zurück", "Clic o ENTER jugar, ESC / Atrás", "Clic ou ENTRÉE jouer, ÉCHAP / Retour", "Clic o INVIO gioca, ESC / Indietro", "クリックかENTERで開始、ESCで戻る", "클릭/ENTER 시작, ESC 뒤로", "Clique ou ENTER jogar, ESC / Voltar", "คลิกหรือ ENTER เล่น, ESC กลับ", "Tıkla/ENTER oyna, ESC geri", "Nhấp/ENTER chơi, ESC quay lại", "Klik/ENTER main, ESC kembali", "点击或回车开始，ESC 返回"];
 const TR_HINT_LS_TOUCH: string[] = ["Tap a level to play", "Level antippen zum Spielen", "Toca un nivel para jugar", "Touchez un niveau pour jouer", "Tocca un livello per giocare", "レベルをタップして開始", "레벨을 탭하여 시작", "Toque num nível para jogar", "แตะด่านเพื่อเล่น", "Oynamak için seviyeye dokun", "Chạm màn để chơi", "Ketuk level untuk main", "点击关卡开始"];
-const TR_HINT_LS_TV: string[] = ["A to play, Menu to go back", "A spielen, Menü zurück", "A jugar, Menú atrás", "A jouer, Menu retour", "A gioca, Menu indietro", "A で開始、メニューで戻る", "A 시작, 메뉴 뒤로", "A jogar, Menu voltar", "A เล่น, เมนู กลับ", "A oyna, Menü geri", "A chơi, Menu quay lại", "A main, Menu kembali", "A 开始，菜单返回"];
+const TR_HINT_LS_CROWN: string[] = ["Crown to select, tap to play", "Krone wählen, tippen spielen", "Corona elegir, toca jugar", "Couronne pour choisir, touchez pour jouer", "Corona scegli, tocca gioca", "クラウンで選択、タップで開始", "크라운 선택, 탭 시작", "Coroa escolher, toque jogar", "หมุนคราวน์เลือก แตะเล่น", "Taç ile seç, dokun oyna", "Vương miện chọn, chạm chơi", "Crown pilih, ketuk main", "表冠选择，点击开始"];
+const TR_HINT_LS_TV: string[] =["A to play, Menu to go back", "A spielen, Menü zurück", "A jugar, Menú atrás", "A jouer, Menu retour", "A gioca, Menu indietro", "A で開始、メニューで戻る", "A 시작, 메뉴 뒤로", "A jogar, Menu voltar", "A เล่น, เมนู กลับ", "A oyna, Menü geri", "A chơi, Menu quay lại", "A main, Menu kembali", "A 开始，菜单返回"];
 const TR_NO_LEVELS1: string[] = ["No levels found", "Keine Level gefunden", "No se encontraron niveles", "Aucun niveau trouvé", "Nessun livello trovato", "レベルが見つかりません", "레벨을 찾을 수 없음", "Nenhum nível encontrado", "ไม่พบด่าน", "Seviye bulunamadı", "Không tìm thấy màn", "Tidak ada level", "未找到关卡"];
 const TR_NO_LEVELS2: string[] = ["Run the editor to create levels!", "Erstelle Level im Editor!", "¡Usa el editor para crear niveles!", "Utilisez l'éditeur pour créer des niveaux !", "Usa l'editor per creare livelli!", "エディタでレベルを作成！", "에디터로 레벨을 만드세요!", "Use o editor para criar níveis!", "ใช้เอดิเตอร์สร้างด่าน!", "Seviye oluşturmak için editörü kullan!", "Dùng trình chỉnh sửa để tạo màn!", "Gunakan editor untuk membuat level!", "用编辑器创建关卡！"];
 const TR_PAUSED: string[] = ["PAUSED", "PAUSE", "PAUSA", "PAUSE", "PAUSA", "一時停止", "일시정지", "PAUSA", "หยุดชั่วคราว", "DURAKLATILDI", "TẠM DỪNG", "JEDA", "已暂停"];
@@ -409,8 +410,8 @@ const sndSelect = loadSound("assets/sounds/select.wav");
 
 // Load music — raw number handles bypass Perry aarch64 NaN-box bug
 // where `music.handle` field reads corrupt FFI f64 args (same issue as Color fields)
-const musMenu = loadMusicRaw("assets/sounds/music_menu.wav");
-const musGame = loadMusicRaw("assets/sounds/music_game.wav");
+const musMenu = loadMusicRaw("assets/sounds/music_menu.ogg");
+const musGame = loadMusicRaw("assets/sounds/music_game.ogg");
 setMusicVolumeRaw(musMenu, 0.5);
 setMusicVolumeRaw(musGame, 0.5);
 
@@ -2019,21 +2020,26 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
   bloom_draw_rect(0, 0, sw, sh, 0, 0, 30, 120);
 
   const s = UI[UI_SCALE];
-  const titleSize = floorf(36.0 * s);
+  // Watch: smaller heading so it clears the system clock overlay (top-right).
+  let titleSize = floorf(36.0 * s);
+  if (WATCH > 0.5) titleSize = floorf(26.0 * s);
   const tw = mtext(L(TR_SELECT_LEVEL), titleSize);
   dtext(L(TR_SELECT_LEVEL), floorf((sw - tw) / 2.0), floorf(40.0 * s), titleSize, 255, 255, 255, 255);
 
   // Back button (top-left) — clickable on desktop, tappable on mobile.
-  // Hover-highlight on desktop so it reads as a button.
-  const backSize = floorf(22.0 * s);
-  const backLabel = L(TR_BACK);
-  const backW = mtext(backLabel, backSize);
-  const backHover = pointInRect(getMouseX(), getMouseY(),
-    floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s)) && MOBILE < 0.5 && TV < 0.5;
-  bloom_draw_rect(floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s),
-    255, 255, 255, backHover ? 60 : 30);
-  dtext(backLabel, floorf(28.0 * s), floorf(40.0 * s), backSize,
-    255, 255, 255, backHover ? 255 : 220);
+  // Hover-highlight on desktop so it reads as a button. Hidden on watch,
+  // where any tap confirms the highlighted level instead.
+  if (WATCH < 0.5) {
+    const backSize = floorf(22.0 * s);
+    const backLabel = L(TR_BACK);
+    const backW = mtext(backLabel, backSize);
+    const backHover = pointInRect(getMouseX(), getMouseY(),
+      floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s)) && MOBILE < 0.5 && TV < 0.5;
+    bloom_draw_rect(floorf(16.0 * s), floorf(34.0 * s), backW + floorf(24.0 * s), floorf(34.0 * s),
+      255, 255, 255, backHover ? 60 : 30);
+    dtext(backLabel, floorf(28.0 * s), floorf(40.0 * s), backSize,
+      255, 255, 255, backHover ? 255 : 220);
+  }
 
   const count = floorf(GS[GI_LCOUNT]);
   const itemSize = floorf(24.0 * s);
@@ -2060,7 +2066,10 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
   }
 
   const instrSize = floorf(18.0 * s);
-  if (MOBILE > 0.5) {
+  if (WATCH > 0.5) {
+    const iw = mtext(L(TR_HINT_LS_CROWN), instrSize);
+    dtext(L(TR_HINT_LS_CROWN), floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
+  } else if (MOBILE > 0.5) {
     const iw = mtext(L(TR_HINT_LS_TOUCH), instrSize);
     dtext(L(TR_HINT_LS_TOUCH), floorf((sw - iw) / 2.0), sh - floorf(40.0 * s), instrSize, 180, 180, 200, 180);
   } else if (TV > 0.5) {
@@ -2362,6 +2371,8 @@ runGame((dt: number): void => {
   // In landscape sh is shorter dim, in portrait sw is shorter
   const shortDim = sw < sh ? sw : sh;
   UI[UI_SCALE] = shortDim / DESIGN_H;
+  // Watch screens are physically tiny — boost all UI text so menus stay legible.
+  if (WATCH > 0.5) UI[UI_SCALE] = UI[UI_SCALE] * 1.4;
 
   // Update music stream (must be called every frame)
   if (MUS[0] > 0.5 && MUS[0] < 1.5) updateMusicStreamRaw(musMenu);

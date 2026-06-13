@@ -24,6 +24,14 @@ exclude = [
   ".git",
   ".claude",
   ".perry",
+  # Build inputs / uncompressed originals — only assets-src/icons/icon.png is
+  # needed at build time (referenced by [project.icons] source below), so keep
+  # the exclude scoped to the heavy subdirectories, not all of assets-src.
+  "assets-src/sounds",
+  "assets-src/icons/icon.iconset",
+  "assets-src/icons/ios",
+  "assets-src/icons/tvos",
+  "assets-src/icons/icon.icns",
   "target",
   "node_modules/**/target",
   "dist",
@@ -50,6 +58,14 @@ exclude = [
   "PERRY-BUG-ARRAY-INDEX-READ.md",
 ]
 
+# Pure-2D game: build the engine without Jolt physics, glTF/DDS model
+# loading, and non-PNG image codecs (sprites are PNG, music is OGG).
+# Requires perry >= 0.5.1126 (nativeLibrary feature forwarding); older
+# perry ignores this table and builds the full engine — still correct,
+# just bigger.
+[native-library."@bloomengine/engine"]
+default-features = false
+
 [macos]
 bundle_id = "com.bloom.jump"
 provisioning_profile = "/Users/amlug/.perry/com_bloom_jump_macos.provisionprofile"
@@ -71,7 +87,7 @@ name = "bloom-jump"
 version = "1.0.77"
 
 [project.icons]
-source = "assets/icon.png"
+source = "assets-src/icons/icon.png"
 
 [tvos]
 bundle_id = "com.bloom.jump"

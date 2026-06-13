@@ -1921,7 +1921,7 @@ function generateAppIcon() {
   drawCircle(img, Math.floor(S * 0.72), Math.floor(S * 0.45), Math.floor(S * 0.06), 255, 220, 50, 255, true);
   drawCircle(img, Math.floor(S * 0.72), Math.floor(S * 0.45), Math.floor(S * 0.06), 200, 170, 30, 255, false);
 
-  savePNG(img, 'assets/icon.png');
+  savePNG(img, 'assets-src/icons/icon.png');
 }
 
 main();
