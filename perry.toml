@@ -81,6 +81,10 @@ signing_identity = "Mac App Distribution: Skelpo GmbH"
 [project]
 build_number = 83
 bundle_id = "com.bloom.jump"
+# Home Screen / App Store display name. Without this, iOS falls back to the
+# executable stem ("bloom-jump"). Requires perry with CFBundleDisplayName
+# support (the [project]/[ios] display_name plist key).
+display_name = "Bloom Jump"
 entry = "src/main.ts"
 features = ["ios-game-loop", "watchos-swift-app"]
 name = "bloom-jump"

@@ -64,22 +64,30 @@ declare function bloom_measure_text_ex(font: number, text: number, size: number,
 // ============================================================
 
 // Platform detection — Perry-safe numeric checks
-// Platform: 0=unknown, 1=macos, 2=ios, 3=windows, 4=linux, 5=android, 6=tvos, 7=web, 8=watchos
-const PLATF = [0.0, 0.0, 0.0, 0.0]; // [platform, isMobile, isTV, isWatch]
+// Platform: 0=unknown, 1=macos, 2=ios, 3=windows, 4=linux, 5=android, 6=tvos, 7=web, 8=watchos, 9=visionos
+const PLATF = [0.0, 0.0, 0.0, 0.0, 0.0]; // [platform, isMobile, isTV, isWatch, isVision]
 PLATF[0] = getPlatform();
 if (PLATF[0] > 1.5 && PLATF[0] < 2.5) PLATF[1] = 1.0;  // iOS
 if (PLATF[0] > 4.5 && PLATF[0] < 5.5) PLATF[1] = 1.0;  // Android
 if (PLATF[0] > 5.5 && PLATF[0] < 6.5) PLATF[2] = 1.0;  // tvOS
 if (PLATF[0] > 7.5 && PLATF[0] < 8.5) PLATF[3] = 1.0;  // watchOS
+// visionOS: the game runs in a flat window in the Shared Space. An eye+pinch is
+// delivered to the window as a UITouch at the gaze location, so we reuse the
+// mobile touch controls (virtual joystick to steer, pinch to jump) — pinch-drag
+// the stick, pinch the right side to jump (two-handed on device). The gamepad
+// path (GP[]) is polled every frame too, so a paired Bluetooth controller also
+// works. VISION marks the platform for the forgiving pinch-jump zone below.
+if (PLATF[0] > 8.5 && PLATF[0] < 9.5) { PLATF[1] = 1.0; PLATF[4] = 1.0; }  // visionOS → pinch/touch controls
 // Store-screenshot capture: force the mobile UI (touch controls + mobile layout)
 // regardless of host platform. Off in the shipping build; flipped on by
 // store/tools/build_capture.sh --mobile. Rendering is identical to a real device
 // (same code path) — only platform detection differs.
 const CAPTURE_MOBILE = false;
-if (CAPTURE_MOBILE) { PLATF[1] = 1.0; PLATF[2] = 0.0; PLATF[3] = 0.0; }
+if (CAPTURE_MOBILE) { PLATF[1] = 1.0; PLATF[2] = 0.0; PLATF[3] = 0.0; PLATF[4] = 0.0; }
 const MOBILE = PLATF[1];
 const TV = PLATF[2];
 const WATCH = PLATF[3];
+const VISION = PLATF[4];
 
 // ============================================================
 // I18N — auto-generated translation table (13 languages).
@@ -178,15 +186,29 @@ const TOUCH_JUMP_Y_OFFSET = 180.0;
 const TOUCH_PAUSE_SIZE = 44.0;
 const TOUCH_PAUSE_X_OFFSET = 60.0;
 const TOUCH_PAUSE_Y_OFFSET = 60.0;
+// On very large screens (iPad) the raw UI scale (shortDim/DESIGN_H ≈ 2.7–3.4)
+// makes the on-screen controls oversized and pushes them far from the corners,
+// since both their radius and their edge offsets scale with it. Cap the scale
+// used for touch-control sizing + placement so they stay thumb-comfortable and
+// corner-hugging on big displays; phones (scale ≲ 2.0) are unaffected. Tune if
+// controls still feel large on the biggest iPads.
+const TOUCH_CTRL_MAX_SCALE = 2.0;
 
-// Gamepad state: [moveX, jump, pause, up, down, confirm]
-const GP = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+// Gamepad state: [moveX, jump, pause, up, down, confirm, prevUp, prevDown]
+// prevUp/prevDown hold last frame's up/down so menu navigation can edge-detect
+// a d-pad/stick push (axis-derived up/down are continuous level states — without
+// the edge check, holding a direction re-fires every frame: infinite-speed menu
+// scroll + a machine-gun select sound). Buttons already use the engine's
+// edge-triggered isGamepadButtonPressed, so only the axis directions need this.
+const GP = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 const GP_MOVE_X = 0;
 const GP_JUMP = 1;
 const GP_PAUSE = 2;
 const GP_UP = 3;
 const GP_DOWN = 4;
 const GP_CONFIRM = 5;
+const GP_PREV_UP = 6;
+const GP_PREV_DOWN = 7;
 const GP_DEADZONE = 0.15;
 
 // ============================================================
@@ -536,7 +558,10 @@ function updateTouchInput(sw: number, sh: number): void {
 
   if (MOBILE < 0.5) return;
 
-  const s = UI[UI_SCALE];
+  // Cap the control scale on large screens (iPad) — see TOUCH_CTRL_MAX_SCALE.
+  // Must match drawTouchControls so the hit regions line up with the visuals.
+  let s = UI[UI_SCALE];
+  if (s > TOUCH_CTRL_MAX_SCALE) s = TOUCH_CTRL_MAX_SCALE;
   const tc = getTouchCount();
   const joyBaseX = TOUCH_JOY_X_POS * s;
   const joyBaseY = sh - TOUCH_JOY_Y_OFFSET * s;
@@ -579,6 +604,14 @@ function updateTouchInput(sw: number, sh: number): void {
       TCH[TI_JUMP_DOWN] = 1.0;
     }
 
+    // visionOS: gaze+pinch is imprecise, so a pinch anywhere on the right side
+    // (outside the joystick zone, below the top-right pause corner) jumps —
+    // you shouldn't have to land on the small jump button. The button still
+    // renders as a hint and its hit-test above still works.
+    if (VISION > 0.5 && tx >= sw * 0.4 && ty > sh * 0.22) {
+      TCH[TI_JUMP_DOWN] = 1.0;
+    }
+
     // Top-right = pause button zone
     const pdx = tx - pauseBaseX;
     const pdy = ty - pauseBaseY;
@@ -609,6 +642,10 @@ function consumeCrownStep(): number {
 }
 
 function updateGamepadInput(): void {
+  // Snapshot last frame's up/down before recomputing, so menu code can detect
+  // the rising edge of a d-pad/stick push (see GP_PREV_* note above).
+  GP[GP_PREV_UP] = GP[GP_UP];
+  GP[GP_PREV_DOWN] = GP[GP_DOWN];
   GP[GP_MOVE_X] = 0.0;
   GP[GP_JUMP] = 0.0;
   GP[GP_PAUSE] = 0.0;
@@ -1751,13 +1788,15 @@ function selectMenuItem(sw: number, sh: number): void {
 
 function updateTitleScreen(sw: number, sh: number): void {
   const menuMax = 1.0;
-  // Keyboard / gamepad navigation
-  if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || GP[GP_DOWN] > 0.5) {
+  // Keyboard / gamepad navigation. Gamepad up/down are edge-detected (push, not
+  // hold) so a held d-pad/stick advances one item per press, matching the
+  // edge-triggered keyboard keys — see GP_PREV_* note.
+  if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || (GP[GP_DOWN] > 0.5 && GP[GP_PREV_DOWN] < 0.5)) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
     if (GS[GI_SEL] > menuMax) GS[GI_SEL] = 0.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(K_UP) || isKeyPressed(K_W) || GP[GP_UP] > 0.5) {
+  if (isKeyPressed(K_UP) || isKeyPressed(K_W) || (GP[GP_UP] > 0.5 && GP[GP_PREV_UP] < 0.5)) {
     GS[GI_SEL] = GS[GI_SEL] - 1.0;
     if (GS[GI_SEL] < 0.0) GS[GI_SEL] = menuMax;
     playSound(sndSelect);
@@ -2083,13 +2122,14 @@ function drawLevelSelect(t: number, sw: number, sh: number): void {
 
 function updateLevelSelect(sw: number, sh: number): void {
   const count = floorf(GS[GI_LCOUNT]);
-  // Keyboard / gamepad navigation
-  if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || GP[GP_DOWN] > 0.5) {
+  // Keyboard / gamepad navigation. Gamepad up/down are edge-detected (push, not
+  // hold) so a held d-pad/stick advances one item per press — see GP_PREV_* note.
+  if (isKeyPressed(K_DOWN) || isKeyPressed(K_S) || (GP[GP_DOWN] > 0.5 && GP[GP_PREV_DOWN] < 0.5)) {
     GS[GI_SEL] = GS[GI_SEL] + 1.0;
     if (GS[GI_SEL] >= count) GS[GI_SEL] = 0.0;
     playSound(sndSelect);
   }
-  if (isKeyPressed(K_UP) || isKeyPressed(K_W) || GP[GP_UP] > 0.5) {
+  if (isKeyPressed(K_UP) || isKeyPressed(K_W) || (GP[GP_UP] > 0.5 && GP[GP_PREV_UP] < 0.5)) {
     GS[GI_SEL] = GS[GI_SEL] - 1.0;
     if (GS[GI_SEL] < 0.0) GS[GI_SEL] = count - 1.0;
     playSound(sndSelect);
@@ -2289,7 +2329,9 @@ function drawLevelCompleteScreen(t: number, sw: number, sh: number): void {
 function drawTouchControls(sw: number, sh: number): void {
   if (MOBILE < 0.5) return;
 
-  const s = UI[UI_SCALE];
+  // Cap the control scale on large screens (iPad) — must match updateTouchInput.
+  let s = UI[UI_SCALE];
+  if (s > TOUCH_CTRL_MAX_SCALE) s = TOUCH_CTRL_MAX_SCALE;
 
   // Virtual joystick (bottom-left)
   const joyR = floorf(TOUCH_JOY_RADIUS * s);
