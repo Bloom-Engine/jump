@@ -8,6 +8,10 @@ No VM. No interpreter. No garbage collector. One TypeScript file becomes a real 
 
 ![Bloom Jump title screen](docs/screenshots/01-title.png)
 
+### 📲 Get it now
+
+[**App Store**](https://apps.apple.com/us/app/bloom-jump/id6761447092) (iOS · macOS · tvOS · visionOS) · [**Apple Watch**](https://apps.apple.com/us/app/bloom-jump-watch/id6779528549) · [**Google Play**](https://play.google.com/store/apps/details?id=com.bloom.jump)
+
 </div>
 
 ---
