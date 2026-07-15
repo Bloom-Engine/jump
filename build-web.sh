@@ -8,29 +8,43 @@
 #   assets/              game sprites, sounds, levels (copied from ./assets)
 #
 # Flags:
-#   --skip-bloom   Reuse existing ../engine/native/web/pkg/ (skip wasm-pack)
+#   --skip-bloom   Reuse the existing pkg/ (skip wasm-pack)
+#   --engine-src   Build bloom_web from the ../engine checkout instead of node_modules
 #   --serve        After build, launch `python3 -m http.server 8080` in dist/web
 
 set -euo pipefail
 
 JUMP_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Build bloom_web from the SAME engine the game compiles against (node_modules),
-# so the runtime glue and the game WASM's FFI ABI never skew. Falls back to a
-# sibling engine source checkout (../engine) for local engine development.
-BLOOM_WEB="$JUMP_DIR/node_modules/@bloomengine/engine/native/web"
-[ -d "$BLOOM_WEB" ] || BLOOM_WEB="$JUMP_DIR/../engine/native/web"
 OUT="$JUMP_DIR/dist/web"
 
 skip_bloom=false
+engine_src=false
 serve=false
 for arg in "$@"; do
   case "$arg" in
     --skip-bloom) skip_bloom=true ;;
+    --engine-src) engine_src=true ;;
     --serve) serve=true ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
 done
+
+# Default: build bloom_web from the SAME engine the game compiles against
+# (node_modules), so the runtime glue and the game WASM's FFI ABI never skew.
+#
+# --engine-src builds from the sibling ../engine checkout instead. Needed for any
+# engine-side change that isn't in a published release yet: the npm tarball ships a
+# prebuilt pkg/ that works, but its bundled Rust *source* does not currently compile
+# (its web crate calls 3D model APIs the shared crate it ships with doesn't expose),
+# so a from-source rebuild of node_modules fails. Verify the result end-to-end
+# (tools/headless-check.js) — nothing else guards ABI skew on this path.
+if $engine_src; then
+  BLOOM_WEB="$JUMP_DIR/../engine/native/web"
+else
+  BLOOM_WEB="$JUMP_DIR/node_modules/@bloomengine/engine/native/web"
+  [ -d "$BLOOM_WEB" ] || BLOOM_WEB="$JUMP_DIR/../engine/native/web"
+fi
 
 if [ ! -d "$BLOOM_WEB" ]; then
   echo "error: bloom web crate not found at $BLOOM_WEB" >&2
